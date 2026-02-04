@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"crypto/md5"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/spf13/cobra"
@@ -15,8 +12,8 @@ import (
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show learning status (like git status)",
-	Long:  `Scan LEARN.md files and show which need updating based on content changes.`,
+	Short: "Show staged/unstaged changes",
+	Long:  `Show the status of tracked files in the aidb database.`,
 	RunE:  runStatus,
 }
 
@@ -30,82 +27,66 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Find all LEARN.md files
-	var learnFiles []string
-	err = filepath.Walk(cfg.DBDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-		if info.Name() == "LEARN.md" {
-			learnFiles = append(learnFiles, path)
-		}
+	// Check if database directory exists
+	if _, err := os.Stat(cfg.DBDir); os.IsNotExist(err) {
+		printInfo("aidb not initialized (run 'aidb add' first)")
 		return nil
-	})
+	}
+
+	// Run git status
+	gitCmd := exec.Command("git", "-C", cfg.DBDir, "status", "--short")
+	out, err := gitCmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("git status failed: %w", err)
 	}
 
-	if len(learnFiles) == 0 {
-		printInfo("No LEARN.md files found")
+	output := strings.TrimSpace(string(out))
+	if output == "" {
+		printInfo("Nothing to commit, working tree clean")
 		return nil
 	}
 
-	fmt.Println("Learning Status:")
+	fmt.Println("Changes in aidb:")
 	fmt.Println()
 
-	needsUpdate := 0
-	for _, learnPath := range learnFiles {
-		dir := filepath.Dir(learnPath)
-		relPath, _ := filepath.Rel(cfg.DBDir, dir)
-
-		// Get content hash of directory (excluding LEARN.md)
-		contentHash := hashDirectory(dir, "LEARN.md")
-
-		// Check if LEARN.md contains the hash
-		learnContent, err := os.ReadFile(learnPath)
-		if err != nil {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if len(line) < 3 {
 			continue
 		}
+		status := line[:2]
+		file := strings.TrimSpace(line[2:])
 
-		hashLine := fmt.Sprintf("<!-- hash:%s -->", contentHash)
-		hasHash := strings.Contains(string(learnContent), hashLine)
-
-		// Get file mod time
-		info, _ := os.Stat(learnPath)
-		modTime := info.ModTime().Format("2006-01-02")
-
-		if hasHash {
-			fmt.Printf("  \033[0;32m✓\033[0m %s (up to date, %s)\n", relPath, modTime)
-		} else {
-			fmt.Printf("  \033[1;33m!\033[0m %s (needs update, %s)\n", relPath, modTime)
-			needsUpdate++
+		switch {
+		case status[0] == 'A':
+			fmt.Printf("  %s new file:   %s\n", colorGreen("+"), file)
+		case status[0] == 'M' || status[1] == 'M':
+			fmt.Printf("  %s modified:   %s\n", colorYellow("~"), file)
+		case status[0] == 'D' || status[1] == 'D':
+			fmt.Printf("  %s deleted:    %s\n", colorRed("-"), file)
+		case status == "??":
+			fmt.Printf("  %s untracked:  %s\n", colorGray("?"), file)
+		default:
+			fmt.Printf("  %s %s\n", status, file)
 		}
 	}
 
 	fmt.Println()
-	if needsUpdate > 0 {
-		fmt.Printf("%d file(s) need updating\n", needsUpdate)
-	} else {
-		printSuccess("All LEARN.md files up to date")
-	}
-
 	return nil
 }
 
-func hashDirectory(dir, exclude string) string {
-	h := md5.New()
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		if info.Name() == exclude {
-			return nil
-		}
-		// Add file path and mod time to hash
-		relPath, _ := filepath.Rel(dir, path)
-		io.WriteString(h, relPath)
-		io.WriteString(h, info.ModTime().Format(time.RFC3339))
-		return nil
-	})
-	return fmt.Sprintf("%x", h.Sum(nil))[:8]
+func colorGreen(s string) string {
+	return fmt.Sprintf("\033[0;32m%s\033[0m", s)
+}
+
+func colorYellow(s string) string {
+	return fmt.Sprintf("\033[1;33m%s\033[0m", s)
+}
+
+func colorRed(s string) string {
+	return fmt.Sprintf("\033[0;31m%s\033[0m", s)
+}
+
+func colorGray(s string) string {
+	return fmt.Sprintf("\033[0;90m%s\033[0m", s)
 }

@@ -16,33 +16,15 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "aidb",
-	Short: "AI Knowledge Database - centralized knowledge file management",
-	Long: `aidb centralizes knowledge files (TASK.md, MEMO.md, LEARN.md) for AI agent workflows.
+	Short: "Centralized file management with git versioning",
+	Long: `aidb stores files in ~/.aidb with symlinks back to original locations.
 
-All files are stored in ~/.aidb with symlinks back to original locations.
-Built-in git versioning provides disaster recovery.
-
-Core Commands:
-  add       Move file to ~/.aidb, create symlink, stage in git
-  commit    Commit staged changes
-  status    Show staged/unstaged changes
-  push      Push commits to remote
-  pull      Pull changes from remote
-  remove    Untrack file, restore to original location
-
-AI Agent Commands:
-  list      List tracked files with metadata
-  seen      Mark file(s) as processed by AI
-  unseen    Mark file(s) for re-processing
-
-Configuration:
-  config    Show or set configuration
-  backup    Enable/disable automatic backup (hourly commit + push)
-
-Examples:
-  aidb add TASK.md         # Start tracking a file
-  aidb commit "Add notes"  # Commit changes
-  aidb list --unseen       # Show files needing AI processing`,
+  aidb init [--remote <url>]   Initialize database
+  aidb add <file>              Track file
+  aidb remove <file>           Untrack file
+  aidb status                  Show changes
+  aidb commit <msg>            Commit changes
+  aidb push                    Push to remote`,
 	Version: "0.2.0",
 }
 

@@ -45,10 +45,24 @@ mkdir -p .cursor/skills/aidb && cp SKILL.md .cursor/skills/aidb/
 - Looking for patterns, decisions, or context from previous work
 - Before implementing something that may have been solved before
 
+## Context Awareness
+
+**IMPORTANT:** aidb is context-aware based on current working directory.
+
+- Commands operate on the **current project** (detected from git repo)
+- Before running aidb commands, verify you're in the correct project directory
+- Use `pwd` to confirm current location
+
+```bash
+# Check current project context
+pwd                         # /Users/you/Code/myproject
+aidb list                   # Shows files for 'myproject' only
+```
+
 ## Quick Start
 
 ```bash
-# Find unread knowledge files
+# Find unread knowledge files (for current project)
 aidb list --unseen
 
 # After reading a file, mark it processed
@@ -124,12 +138,13 @@ cp AGENTS.md ~/.claude/agents/aidb.md
 
 ### Agent Workflow
 
-1. Check `aidb list --unseen` for project files
-2. Read and categorize insights into project `_aidb/`
-3. Check `aidb list --unseen --aidb` for synthesis candidates
-4. Extract patterns to global `~/.aidb/_aidb/`
-5. Mark processed: `aidb seen <file>`
-6. Commit: `aidb commit "message"`
+1. **Verify project context**: `pwd` to confirm current directory
+2. Check `aidb list --unseen` for current project files
+3. Read and categorize insights into project `_aidb/`
+4. Check `aidb list --unseen --aidb` for synthesis candidates
+5. Extract patterns to global `~/.aidb/_aidb/`
+6. Mark processed: `aidb seen <file>`
+7. Commit: `aidb commit "message"`
 
 ## Path Structure
 

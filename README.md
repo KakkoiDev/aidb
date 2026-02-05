@@ -161,7 +161,7 @@ mkdir -p .cursor/rules && cp SKILL.md .cursor/rules/aidb.mdc
 ### Agent (Claude Code only)
 Full automation with knowledge harvesting subagent.
 ```bash
-mkdir -p ~/.claude/agents && cp agents/aidb.md ~/.claude/agents/
+mkdir -p ~/.claude/agents && cp AGENTS.md ~/.claude/agents/aidb.md
 ```
 
 ## License

@@ -40,6 +40,9 @@ type UserConfig struct {
 	Backup struct {
 		Enabled bool `yaml:"enabled,omitempty"`
 	} `yaml:"backup,omitempty"`
+	Git struct {
+		Remote string `yaml:"remote,omitempty"`
+	} `yaml:"git,omitempty"`
 }
 
 func getConfigPath() string {
@@ -91,6 +94,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 		fmt.Printf("db.path = %s\n", cfg.DBDir)
 		fmt.Printf("backup.enabled = %v\n", userCfg.Backup.Enabled)
+		fmt.Printf("git.remote = %s\n", GetRemoteURL(cfg.DBDir))
 		fmt.Println()
 		fmt.Printf("# Config file: %s\n", getConfigPath())
 		return nil
@@ -105,6 +109,8 @@ func runConfig(cmd *cobra.Command, args []string) error {
 			fmt.Println(cfg.DBDir)
 		case "backup.enabled":
 			fmt.Println(userCfg.Backup.Enabled)
+		case "git.remote":
+			fmt.Println(GetRemoteURL(cfg.DBDir))
 		default:
 			return fmt.Errorf("unknown config key: %s", key)
 		}
@@ -118,6 +124,12 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		userCfg.DB.Path = value
 	case "backup.enabled":
 		userCfg.Backup.Enabled = value == "true"
+	case "git.remote":
+		if err := configureRemote(cfg.DBDir, value); err != nil {
+			return fmt.Errorf("failed to configure remote: %w", err)
+		}
+		printSuccess(fmt.Sprintf("Set %s = %s", key, value))
+		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
 	}

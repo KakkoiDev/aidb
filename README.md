@@ -48,8 +48,9 @@ aidb pull                   # Pull from remote
 | `aidb init` | Initialize ~/.aidb |
 | `aidb add <file>` | Track file (move to ~/.aidb, create symlink) |
 | `aidb remove <file>` | Untrack file (restore to original location) |
-| `aidb list` | List tracked files |
+| `aidb list` | List tracked files (excludes _aidb/) |
 | `aidb list --unseen` | Show files needing attention |
+| `aidb list --aidb` | Show only _aidb/ knowledge files |
 | `aidb seen <file>` | Mark file as processed |
 | `aidb unseen <file>` | Re-queue file for processing |
 | `aidb status` | Show git status |
@@ -65,6 +66,26 @@ aidb pull                   # Pull from remote
 | TASK.md | Implementation plans, progress tracking |
 | LEARN.md | Key insights, patterns, decisions |
 | COACH.md | Development approach reflections |
+
+## Knowledge Harvesting
+
+Two-tier knowledge system for pattern extraction:
+
+| Tier | Location | Purpose |
+|------|----------|---------|
+| Project | `{project}/_aidb/` | Insights specific to that project |
+| Global | `~/.aidb/_aidb/` | Patterns across all projects |
+
+```bash
+# Regular files (MEMO, TASK, LEARN)
+aidb list --unseen
+
+# Knowledge files (_aidb/)
+aidb list --unseen --aidb
+
+# Mark as processed
+aidb seen project/_aidb/patterns.md
+```
 
 ## How It Works
 

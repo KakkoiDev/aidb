@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/KakkoiDev/aidb/internal/metadata"
@@ -14,6 +15,7 @@ import (
 var (
 	listUnseen bool
 	listJSON   bool
+	listAidb   bool
 )
 
 var listCmd = &cobra.Command{
@@ -22,9 +24,11 @@ var listCmd = &cobra.Command{
 	Long: `List all tracked files in the aidb database with their metadata.
 
 Examples:
-  aidb list           # List all files
-  aidb list --unseen  # List only unseen files
-  aidb list --json    # Output as JSON`,
+  aidb list                 # List all files (excludes _aidb/)
+  aidb list --unseen        # List only unseen files
+  aidb list --aidb          # List only _aidb/ knowledge files
+  aidb list --unseen --aidb # Unseen knowledge files only
+  aidb list --json          # Output as JSON`,
 	RunE: runList,
 }
 
@@ -32,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().BoolVar(&listUnseen, "unseen", false, "Show only unseen files")
 	listCmd.Flags().BoolVar(&listJSON, "json", false, "Output as JSON")
+	listCmd.Flags().BoolVar(&listAidb, "aidb", false, "Show only _aidb/ knowledge files")
 }
 
 type FileEntry struct {
@@ -82,6 +87,17 @@ func runList(cmd *cobra.Command, args []string) error {
 
 		relPath, _ := filepath.Rel(cfg.DBDir, path)
 
+		// Check if file is in _aidb/ directory
+		isAidbFile := strings.Contains(relPath, "/_aidb/") || strings.HasPrefix(relPath, "_aidb/")
+
+		// Filter based on --aidb flag
+		if listAidb && !isAidbFile {
+			return nil // --aidb flag: skip non-aidb files
+		}
+		if !listAidb && isAidbFile {
+			return nil // no --aidb flag: skip aidb files
+		}
+
 		// Get current hash
 		currentHash, _ := metadata.HashFile(path)
 
@@ -119,7 +135,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if listJSON {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
 		return enc.Encode(entries)
 	}

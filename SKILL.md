@@ -74,6 +74,59 @@ aidb unseen <file>
 3. `aidb seen <file>` - mark as processed
 4. Apply knowledge to current task
 
+## Knowledge Files
+
+Two-tier knowledge system for pattern extraction:
+
+| Tier | Location | Purpose |
+|------|----------|---------|
+| Project | `{project}/_aidb/` | Insights specific to that project |
+| Global | `~/.aidb/_aidb/` | Patterns across all projects |
+
+### Workflow
+
+```bash
+# Regular files (MEMO, TASK, LEARN)
+aidb list --unseen
+
+# Knowledge files (_aidb/)
+aidb list --unseen --aidb
+
+# Mark as processed
+aidb seen project/_aidb/patterns.md
+```
+
+### File Format
+
+```markdown
+# Topic Name
+
+What this file covers: [brief description]
+
+---
+
+## [Date] Entry
+...
+```
+
+### Guidelines
+
+- Max 500 lines per file
+- Categorize into best-fit existing file
+- Create new file only if no category fits
+- lowercase-kebab-case filenames (e.g., `api-patterns.md`)
+
+## aidb Agent
+
+Full lifecycle knowledge management:
+
+1. Check `aidb list --unseen` for project files
+2. Read and categorize insights into project `_aidb/`
+3. Check `aidb list --unseen --aidb` for synthesis candidates
+4. Extract patterns to global `~/.aidb/_aidb/`
+5. Mark processed: `aidb seen <file>`
+6. Commit: `aidb commit "message"`
+
 ## Path Structure
 
 Files are stored as: `~/.aidb/<project>/<branch>/<file>.md`

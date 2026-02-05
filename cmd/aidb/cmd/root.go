@@ -19,12 +19,20 @@ var rootCmd = &cobra.Command{
 	Short: "Centralized file management with git versioning",
 	Long: `aidb stores files in ~/.aidb with symlinks back to original locations.
 
+Commands:
   aidb init [--remote <url>]   Initialize database
   aidb add <file>              Track file
   aidb remove <file>           Untrack file
+  aidb list [--unseen]         List tracked files
+  aidb seen/unseen <file>      Mark file status
   aidb status                  Show changes
   aidb commit <msg>            Commit changes
-  aidb push                    Push to remote`,
+  aidb push/pull               Sync with remote
+
+Usage modes (all opt-in):
+  CLI only         Just this tool for manual knowledge management
+  + Skill          Add SKILL.md to ~/.claude/skills/aidb/ for AI prompting
+  + Agent          Add agents/aidb.md to ~/.claude/agents/ for automation`,
 	Version: "0.2.0",
 }
 

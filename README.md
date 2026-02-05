@@ -71,7 +71,7 @@ aidb pull                   # Pull from remote
 - Files stored in `~/.aidb/{repo}/{branch}/{filename}`
 - Symlinks created at original locations
 - Git versioning for history and sync
-- Seen/unseen tracking for knowledge management
+- Seen/unseen tracking with automatic change detection (modified files become unseen)
 
 ## Configuration
 

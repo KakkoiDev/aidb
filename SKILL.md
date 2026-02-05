@@ -1,6 +1,43 @@
+---
+name: aidb
+description: AI knowledge database for accessing accumulated insights from past sessions. Use when starting tasks in projects with existing knowledge, looking for patterns/decisions from previous work, or before implementing something that may have been solved before.
+license: MIT
+metadata:
+  author: KakkoiDev
+  version: "1.0"
+---
+
 # aidb - AI Knowledge Database
 
 AI agent skill for accessing accumulated knowledge from past sessions.
+
+## Installation
+
+### Binary Installation
+
+```bash
+# Go users
+go install github.com/KakkoiDev/aidb/cmd/aidb@latest
+
+# From source
+git clone https://github.com/KakkoiDev/aidb && cd aidb && make install
+```
+
+### Skill Installation
+
+```bash
+# Using skills CLI (recommended)
+npx skills add KakkoiDev/aidb
+
+# Manual - Claude Code
+cp -r aidb ~/.claude/skills/
+
+# Manual - GitHub Copilot
+cp -r aidb .github/skills/
+
+# Manual - Cursor/other
+cp -r aidb .cursor/skills/
+```
 
 ## When to Use
 

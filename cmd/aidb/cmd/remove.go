@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KakkoiDev/aidb/internal/config"
+	"github.com/KakkoiDev/aidb/internal/metadata"
 	"github.com/spf13/cobra"
 )
 
@@ -84,6 +85,14 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	// Remove from git (--cached keeps history)
 	gitCmd := exec.Command("git", "-C", cfg.DBDir, "rm", "--cached", target)
 	gitCmd.Run() // Ignore error, file might not be staged
+
+	// Clean up metadata
+	meta, err := metadata.New(cfg.DBDir)
+	if err == nil {
+		relPath, _ := filepath.Rel(cfg.DBDir, target)
+		meta.Remove(relPath)
+		meta.Save()
+	}
 
 	printSuccess(fmt.Sprintf("Removed %s from tracking", filename))
 	return nil

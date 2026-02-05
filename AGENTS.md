@@ -15,12 +15,13 @@ Centralized file management with git versioning. Track files in ~/.aidb with sym
 **Does:**
 - Check `aidb list --unseen` for pending files
 - Read files and extract transferable insights
-- Write insights to `{project}/_aidb/` (project tier)
+- Write insights to `~/.aidb/{project}/{branch}/_aidb/` (project tier)
 - Mark processed with `aidb seen <file>`
 - Commit with `aidb commit "harvest: description"`
 - Promote to `~/.aidb/_aidb/` ONLY when pattern exists in 2+ projects
 
 **Never:**
+- Create `_aidb/` folder in the actual project working directory
 - Write directly to `~/.aidb/_aidb/` (global) without promotion criteria
 - Implement code
 - Modify source project files
@@ -38,8 +39,8 @@ aidb list --aidb              # See available knowledge
 ```bash
 aidb list --unseen            # Find pending files
 # Read files, extract insights
-# Write to {project}/_aidb/ (NEVER directly to global)
-aidb add _aidb/*.md           # Track project knowledge files
+# Write directly to ~/.aidb/{project}/{branch}/_aidb/*.md
+# Do NOT create _aidb/ in the project working directory
 aidb seen <file>              # Mark source files processed
 aidb commit "harvest: description"
 ```
@@ -60,20 +61,24 @@ aidb commit "harvest: description"
 
 ## Two-Tier Knowledge System
 
+All knowledge files live inside `~/.aidb/` storage:
+
 | Tier | Location | Purpose |
 |------|----------|---------|
-| Project | `{project}/_aidb/` | Project-specific insights (ALWAYS write here first) |
+| Project | `~/.aidb/{project}/{branch}/_aidb/` | Project-specific insights (ALWAYS write here first) |
 | Global | `~/.aidb/_aidb/` | Cross-project patterns (promoted only) |
 
 **CRITICAL: Always write to project tier first.** Global tier is for promotion only.
 
 ```
-Harvest → {project}/_aidb/  (always)
-                ↓
-    Pattern in 2+ projects?
-                ↓
-         ~/.aidb/_aidb/     (promotion)
+Harvest → ~/.aidb/{project}/{branch}/_aidb/  (always)
+                        ↓
+            Pattern in 2+ projects?
+                        ↓
+                 ~/.aidb/_aidb/              (promotion)
 ```
+
+**Never create `_aidb/` in the actual project working directory.** All knowledge stays in `~/.aidb/`.
 
 **Promote to global ONLY when:**
 - Same pattern documented in 2+ different projects
@@ -127,10 +132,12 @@ When to promote project knowledge to global:
 
 ```bash
 # 1. Check project knowledge across multiple projects
-aidb list --aidb              # See all project _aidb/ files
+aidb list --aidb              # See all _aidb/ files
 
 # 2. Identify patterns appearing in 2+ projects
-# Example: NestJS Query behavior documented in project-a/_aidb/ AND project-b/_aidb/
+# Example: ~/.aidb/project-a/main/_aidb/patterns.md
+#      AND ~/.aidb/project-b/main/_aidb/patterns.md
+#      both document NestJS Query behavior
 
 # 3. Extract generalized pattern to global
 # Write to ~/.aidb/_aidb/framework-reality.md

@@ -7,9 +7,9 @@ metadata:
   version: "1.0"
 ---
 
-# aidb - AI Knowledge Database
+# aidb - AI Knowledge Database CLI
 
-AI agent skill for accessing accumulated knowledge from past sessions.
+Command-line tool for managing accumulated knowledge from development sessions.
 
 ## Installation
 
@@ -31,12 +31,6 @@ npx skills add KakkoiDev/aidb
 
 # Manual - Claude Code
 mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
-
-# Manual - GitHub Copilot
-mkdir -p .github/skills/aidb && cp SKILL.md .github/skills/aidb/
-
-# Manual - Cursor/other
-mkdir -p .cursor/skills/aidb && cp SKILL.md .cursor/skills/aidb/
 ```
 
 ## When to Use
@@ -51,106 +45,35 @@ mkdir -p .cursor/skills/aidb && cp SKILL.md .cursor/skills/aidb/
 
 - Commands operate on the **current project** (detected from git repo)
 - Before running aidb commands, verify you're in the correct project directory
-- Use `pwd` to confirm current location
 
 ```bash
-# Check current project context
-pwd                         # /Users/you/Code/myproject
+pwd                         # Verify: /Users/you/Code/myproject
 aidb list                   # Shows files for 'myproject' only
 ```
 
-## Quick Start
+## Commands
 
-```bash
-# Find unread knowledge files (for current project)
-aidb list --unseen
-
-# After reading a file, mark it processed
-aidb seen <file>
-
-# Re-queue a file for processing
-aidb unseen <file>
-```
-
-## Workflow
-
-1. `aidb list --unseen` - get files needing attention
-2. Read relevant files based on current task context
-3. `aidb seen <file>` - mark as processed
-4. Apply knowledge to current task
-
-## Knowledge Files
-
-Two-tier knowledge system for pattern extraction:
-
-| Tier | Location | Purpose |
-|------|----------|---------|
-| Project | `~/.aidb/{project}/{branch}/_aidb/` | Insights specific to that project |
-| Global | `~/.aidb/_aidb/` | Patterns across all projects |
-
-### Workflow
-
-```bash
-# Tracked files
-aidb list --unseen
-
-# Knowledge files (_aidb/)
-aidb list --unseen --aidb
-
-# Mark as processed
-aidb seen project/_aidb/patterns.md
-```
-
-### File Format
-
-```markdown
-# Topic Name
-
-What this file covers: [brief description]
-
----
-
-## [Date] Entry
-...
-```
-
-### Guidelines
-
-- Max 500 lines per file
-- Categorize into best-fit existing file
-- Create new file only if no category fits
-- lowercase-kebab-case filenames (e.g., `api-patterns.md`)
-
-## aidb Agent
-
-A standalone Claude Code subagent for full lifecycle knowledge management.
-
-### Agent Installation
-
-```bash
-# Copy to Claude Code agents directory
-mkdir -p ~/.claude/agents
-curl -o ~/.claude/agents/aidb.md https://raw.githubusercontent.com/KakkoiDev/aidb/master/AGENTS.md
-
-# Or from local clone
-cp AGENTS.md ~/.claude/agents/aidb.md
-```
-
-### Agent Workflow
-
-1. **Verify project context**: `pwd` to confirm current directory
-2. Check `aidb list --unseen` for current project files
-3. Read and categorize insights into project `_aidb/`
-4. Check `aidb list --unseen --aidb` for synthesis candidates
-5. Extract patterns to global `~/.aidb/_aidb/`
-6. Mark processed: `aidb seen <file>`
-7. Commit: `aidb commit "message"`
+| Command | Description |
+|---------|-------------|
+| `aidb init` | Initialize ~/.aidb |
+| `aidb add <file>` | Track file (move to ~/.aidb, create symlink) |
+| `aidb remove <file>` | Untrack file (restore original) |
+| `aidb list` | List tracked files |
+| `aidb list --unseen` | Files needing attention |
+| `aidb list --aidb` | Knowledge files only (_aidb/) |
+| `aidb seen <file>` | Mark as processed |
+| `aidb unseen <file>` | Re-queue for processing |
+| `aidb commit "msg"` | Commit changes |
+| `aidb push` | Push to remote |
+| `aidb pull` | Pull from remote |
 
 ## Path Structure
 
-Files are stored as: `~/.aidb/<project>/<branch>/<file>.md`
+Files stored as: `~/.aidb/<project>/<branch>/<file>.md`
 
-Example: `~/.aidb/myproject/main/notes.md`
+Two-tier knowledge system:
+- Project: `~/.aidb/{project}/{branch}/_aidb/`
+- Global: `~/.aidb/_aidb/` (promoted patterns only)
 
 ## JSON Output
 
@@ -162,3 +85,7 @@ Returns:
 ```json
 [{"path":"project/branch/notes.md","seen":false,"hash":"","modified":false}]
 ```
+
+## Agent Behavior
+
+For autonomous knowledge harvesting behavior (what/when to capture), see the `aidb` agent definition in AGENTS.md or `~/.claude/agents/aidb.md`.

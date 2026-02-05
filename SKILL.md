@@ -118,7 +118,20 @@ What this file covers: [brief description]
 
 ## aidb Agent
 
-Full lifecycle knowledge management:
+A standalone Claude Code subagent for full lifecycle knowledge management.
+
+### Agent Installation
+
+```bash
+# Copy to Claude Code agents directory
+mkdir -p ~/.claude/agents
+curl -o ~/.claude/agents/aidb.md https://raw.githubusercontent.com/KakkoiDev/aidb/master/agents/aidb.md
+
+# Or from local clone
+cp agents/aidb.md ~/.claude/agents/
+```
+
+### Agent Workflow
 
 1. Check `aidb list --unseen` for project files
 2. Read and categorize insights into project `_aidb/`

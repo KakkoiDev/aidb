@@ -27,12 +27,7 @@ Commands:
   aidb seen/unseen <file>      Mark file status
   aidb status                  Show changes
   aidb commit <msg>            Commit changes
-  aidb push/pull               Sync with remote
-
-Usage modes (all opt-in):
-  CLI only         Just this tool for manual knowledge management
-  + Skill          Add SKILL.md to ~/.claude/skills/aidb/ for AI prompting
-  + Agent          Add agents/aidb.md to ~/.claude/agents/ for automation`,
+  aidb push/pull               Sync with remote`,
 	Version: "0.2.0",
 }
 

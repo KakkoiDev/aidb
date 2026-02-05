@@ -135,54 +135,34 @@ sudo make install              # Install to /usr/local/bin
 sudo make uninstall
 ```
 
-## Usage Modes
+## AI Integration
 
-All components are opt-in. Mix and match based on your needs:
-
-### CLI Only
-
-Just the `aidb` tool for manual knowledge management.
-
+### Universal (AGENTS.md)
+Works with Cursor, Windsurf, Codex, Aider, Devin, and 20+ tools.
 ```bash
-go install github.com/KakkoiDev/aidb/cmd/aidb@latest
-aidb init
+# Already at repo root as AGENTS.md
+# Copy to project root for workspace-specific use
+cp AGENTS.md /path/to/project/
 ```
 
-Use cases:
-- Manual tracking of MEMO.md, TASK.md, LEARN.md
-- Git-backed knowledge versioning
-- Seen/unseen workflow for processing files
-
-### Skill + CLI
-
-Add the skill for knowledge-aware AI prompting.
-
+### Skill (SKILL.md)
+Deeper integration for Claude Code and GitHub Copilot.
 ```bash
-# Install skill
+# Claude Code
 mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
+
+# GitHub Copilot
+mkdir -p ~/.copilot/skills/aidb && cp SKILL.md ~/.copilot/skills/aidb/
+
+# Cursor (rename to .mdc)
+mkdir -p .cursor/rules && cp SKILL.md .cursor/rules/aidb.mdc
 ```
 
-Use cases:
-- AI agents can query knowledge with `/aidb`
-- Context discovery at session start
-- Pattern lookup before implementation
-
-### Agent + Skill + CLI
-
-Full automation with the harvesting agent.
-
+### Agent (Claude Code only)
+Full automation with knowledge harvesting subagent.
 ```bash
-# Install agent
 mkdir -p ~/.claude/agents && cp agents/aidb.md ~/.claude/agents/
-
-# Or fetch directly
-curl -o ~/.claude/agents/aidb.md https://raw.githubusercontent.com/KakkoiDev/aidb/master/agents/aidb.md
 ```
-
-Use cases:
-- Automatic knowledge extraction after tasks
-- Two-tier pattern synthesis (project → global)
-- Hands-off knowledge base maintenance
 
 ## License
 

@@ -15,12 +15,13 @@ Centralized file management with git versioning. Track files in ~/.aidb with sym
 **Does:**
 - Check `aidb list --unseen` for pending files
 - Read files and extract transferable insights
-- Categorize insights into `_aidb/` knowledge files
-- Promote cross-project patterns to global `~/.aidb/_aidb/`
+- Write insights to `{project}/_aidb/` (project tier)
 - Mark processed with `aidb seen <file>`
 - Commit with `aidb commit "harvest: description"`
+- Promote to `~/.aidb/_aidb/` ONLY when pattern exists in 2+ projects
 
 **Never:**
+- Write directly to `~/.aidb/_aidb/` (global) without promotion criteria
 - Implement code
 - Modify source project files
 - Run tests or builds
@@ -36,8 +37,10 @@ aidb list --aidb              # See available knowledge
 **Harvest knowledge** (after task):
 ```bash
 aidb list --unseen            # Find pending files
-# Process files, extract insights, update _aidb/
-aidb seen <file>              # Mark processed
+# Read files, extract insights
+# Write to {project}/_aidb/ (NEVER directly to global)
+aidb add _aidb/*.md           # Track project knowledge files
+aidb seen <file>              # Mark source files processed
 aidb commit "harvest: description"
 ```
 
@@ -59,13 +62,23 @@ aidb commit "harvest: description"
 
 | Tier | Location | Purpose |
 |------|----------|---------|
-| Project | `{project}/_aidb/` | Project-specific insights |
-| Global | `~/.aidb/_aidb/` | Cross-project patterns |
+| Project | `{project}/_aidb/` | Project-specific insights (ALWAYS write here first) |
+| Global | `~/.aidb/_aidb/` | Cross-project patterns (promoted only) |
 
-**Promote to global when:**
-- Pattern applies to 2+ projects
-- Framework behavior differs from docs
-- Debugging technique is technology-agnostic
+**CRITICAL: Always write to project tier first.** Global tier is for promotion only.
+
+```
+Harvest → {project}/_aidb/  (always)
+                ↓
+    Pattern in 2+ projects?
+                ↓
+         ~/.aidb/_aidb/     (promotion)
+```
+
+**Promote to global ONLY when:**
+- Same pattern documented in 2+ different projects
+- Framework reality gap confirmed across versions
+- Technique is completely technology-agnostic
 
 ## Knowledge File Organization
 
@@ -106,6 +119,27 @@ What this file covers: [brief description]
 
 ## [Date] Entry Title
 [insight content]
+```
+
+## Promotion Workflow
+
+When to promote project knowledge to global:
+
+```bash
+# 1. Check project knowledge across multiple projects
+aidb list --aidb              # See all project _aidb/ files
+
+# 2. Identify patterns appearing in 2+ projects
+# Example: NestJS Query behavior documented in project-a/_aidb/ AND project-b/_aidb/
+
+# 3. Extract generalized pattern to global
+# Write to ~/.aidb/_aidb/framework-reality.md
+
+# 4. Add cross-reference in project files
+# "See also: ~/.aidb/_aidb/framework-reality.md#nestjs-query"
+
+# 5. Commit
+aidb commit "promote: NestJS query pattern to global"
 ```
 
 ## Example Entry

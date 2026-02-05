@@ -30,13 +30,13 @@ git clone https://github.com/KakkoiDev/aidb && cd aidb && make install
 npx skills add KakkoiDev/aidb
 
 # Manual - Claude Code
-cp -r aidb ~/.claude/skills/
+mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
 
 # Manual - GitHub Copilot
-cp -r aidb .github/skills/
+mkdir -p .github/skills/aidb && cp SKILL.md .github/skills/aidb/
 
 # Manual - Cursor/other
-cp -r aidb .cursor/skills/
+mkdir -p .cursor/skills/aidb && cp SKILL.md .cursor/skills/aidb/
 ```
 
 ## When to Use

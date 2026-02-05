@@ -114,6 +114,13 @@ sudo make install              # Install to /usr/local/bin
 sudo make uninstall
 ```
 
+## AI Agent Skill
+
+Install as Claude Code skill for knowledge-aware AI assistance:
+```bash
+mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
+```
+
 ## License
 
 MIT

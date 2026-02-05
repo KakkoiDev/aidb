@@ -18,7 +18,6 @@ aidb init --remote git@github.com:user/kb.git  # With remote sync
 **Starting a new task** → Check for existing knowledge
 ```bash
 aidb list --unseen          # Find unread files
-aidb read MEMO.md           # Read relevant context
 ```
 
 **After learning something** → Mark as processed
@@ -29,8 +28,8 @@ aidb unseen <file>          # Re-queue for attention
 
 **Tracking files** → Add to knowledge base
 ```bash
-aidb add MEMO.md            # Track file (creates symlink)
-aidb remove MEMO.md         # Untrack file (restores original)
+aidb add <file>             # Track file (creates symlink)
+aidb remove <file>          # Untrack file (restores original)
 ```
 
 **Syncing knowledge** → Git versioning
@@ -58,26 +57,17 @@ aidb pull                   # Pull from remote
 | `aidb push` | Push to remote |
 | `aidb pull` | Pull from remote |
 
-## File Types
-
-| File | Purpose |
-|------|---------|
-| MEMO.md | Codebase analysis, architecture notes |
-| TASK.md | Implementation plans, progress tracking |
-| LEARN.md | Key insights, patterns, decisions |
-| COACH.md | Development approach reflections |
-
 ## Knowledge Harvesting
 
 Two-tier knowledge system for pattern extraction:
 
 | Tier | Location | Purpose |
 |------|----------|---------|
-| Project | `{project}/_aidb/` | Insights specific to that project |
+| Project | `~/.aidb/{project}/{branch}/_aidb/` | Insights specific to that project |
 | Global | `~/.aidb/_aidb/` | Patterns across all projects |
 
 ```bash
-# Regular files (MEMO, TASK, LEARN)
+# Tracked files
 aidb list --unseen
 
 # Knowledge files (_aidb/)

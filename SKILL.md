@@ -58,15 +58,6 @@ aidb seen <file>
 aidb unseen <file>
 ```
 
-## File Types
-
-| File | Purpose |
-|------|---------|
-| MEMO.md | Codebase analysis, architecture notes |
-| TASK.md | Implementation plans, progress tracking |
-| LEARN.md | Key insights, patterns, decisions |
-| COACH.md | Development approach reflections |
-
 ## Workflow
 
 1. `aidb list --unseen` - get files needing attention
@@ -80,13 +71,13 @@ Two-tier knowledge system for pattern extraction:
 
 | Tier | Location | Purpose |
 |------|----------|---------|
-| Project | `{project}/_aidb/` | Insights specific to that project |
+| Project | `~/.aidb/{project}/{branch}/_aidb/` | Insights specific to that project |
 | Global | `~/.aidb/_aidb/` | Patterns across all projects |
 
 ### Workflow
 
 ```bash
-# Regular files (MEMO, TASK, LEARN)
+# Tracked files
 aidb list --unseen
 
 # Knowledge files (_aidb/)
@@ -125,10 +116,10 @@ A standalone Claude Code subagent for full lifecycle knowledge management.
 ```bash
 # Copy to Claude Code agents directory
 mkdir -p ~/.claude/agents
-curl -o ~/.claude/agents/aidb.md https://raw.githubusercontent.com/KakkoiDev/aidb/master/agents/aidb.md
+curl -o ~/.claude/agents/aidb.md https://raw.githubusercontent.com/KakkoiDev/aidb/master/AGENTS.md
 
 # Or from local clone
-cp agents/aidb.md ~/.claude/agents/
+cp AGENTS.md ~/.claude/agents/aidb.md
 ```
 
 ### Agent Workflow
@@ -144,7 +135,7 @@ cp agents/aidb.md ~/.claude/agents/
 
 Files are stored as: `~/.aidb/<project>/<branch>/<file>.md`
 
-Example: `~/.aidb/meetsone/master/LEARN.md`
+Example: `~/.aidb/myproject/main/notes.md`
 
 ## JSON Output
 
@@ -154,5 +145,5 @@ aidb list --unseen --json
 
 Returns:
 ```json
-[{"path":"project/branch/MEMO.md","seen":false,"hash":"","modified":false}]
+[{"path":"project/branch/notes.md","seen":false,"hash":"","modified":false}]
 ```

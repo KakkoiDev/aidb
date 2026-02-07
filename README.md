@@ -116,7 +116,7 @@ go install github.com/KakkoiDev/aidb/cmd/aidb@latest
 
 **From source**
 ```bash
-git clone https://github.com/KakkoiDev/aidb && cd aidb
+git clone git@github.com:KakkoiDev/aidb.git && cd aidb
 make build && sudo make install
 ```
 

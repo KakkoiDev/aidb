@@ -6,7 +6,7 @@ BINDIR ?= $(PREFIX)/bin
 build:
 	go build -o aidb ./cmd/aidb
 
-install: build
+install:
 	install -d $(BINDIR)
 	install -m 755 aidb $(BINDIR)/aidb
 

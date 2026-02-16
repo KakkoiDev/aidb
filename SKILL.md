@@ -9,11 +9,11 @@ metadata:
 
 # aidb - AI Knowledge Database CLI
 
-Command-line tool for managing accumulated knowledge from development sessions.
+Context-aware tool operating on the current git project.
 
 ## Installation
 
-### Binary Installation
+### Binary
 
 ```bash
 # Go users
@@ -23,7 +23,7 @@ go install github.com/KakkoiDev/aidb/cmd/aidb@latest
 git clone https://github.com/KakkoiDev/aidb && cd aidb && make install
 ```
 
-### Skill Installation
+### Skill
 
 ```bash
 # Using skills CLI (recommended)
@@ -31,24 +31,6 @@ npx skills add KakkoiDev/aidb
 
 # Manual - Claude Code
 mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
-```
-
-## When to Use
-
-- Starting a new task in a project with existing knowledge
-- Looking for patterns, decisions, or context from previous work
-- Before implementing something that may have been solved before
-
-## Context Awareness
-
-**IMPORTANT:** aidb is context-aware based on current working directory.
-
-- Commands operate on the **current project** (detected from git repo)
-- Before running aidb commands, verify you're in the correct project directory
-
-```bash
-pwd                         # Verify: /Users/you/Code/myproject
-aidb list                   # Shows files for 'myproject' only
 ```
 
 ## Commands
@@ -75,17 +57,6 @@ Two-tier knowledge system:
 - Project: `~/.aidb/{project}/{branch}/_aidb/`
 - Global: `~/.aidb/_aidb/` (promoted patterns only)
 
-## JSON Output
-
-```bash
-aidb list --unseen --json
-```
-
-Returns:
-```json
-[{"path":"project/branch/notes.md","seen":false,"hash":"","modified":false}]
-```
-
 ## Agent Behavior
 
-For autonomous knowledge harvesting behavior (what/when to capture), see the `aidb` agent definition in AGENTS.md or `~/.claude/agents/aidb.md`.
+For harvesting logic (what/when to capture), see `~/.claude/agents/aidb.md`.

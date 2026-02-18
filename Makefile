@@ -1,9 +1,11 @@
-BINDIR ?= $(or $(GOBIN),/usr/local/bin)
+VERSION ?= dev
+LDFLAGS := -s -w -X github.com/KakkoiDev/aidb/cmd/aidb/cmd.version=$(VERSION)
+BINDIR  ?= $(or $(GOBIN),/usr/local/bin)
 
-.PHONY: build install uninstall test clean
+.PHONY: build install uninstall test clean release
 
 build:
-	go build -o aidb ./cmd/aidb
+	go build -ldflags '$(LDFLAGS)' -o aidb ./cmd/aidb
 
 install:
 	install -d $(BINDIR)
@@ -17,3 +19,6 @@ test:
 
 clean:
 	rm -f aidb
+
+release:
+	goreleaser release --snapshot --clean

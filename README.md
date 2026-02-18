@@ -6,7 +6,7 @@ Centralized knowledge for AI agents. Track insights across projects. Never lose 
 
 ```bash
 # Install
-go install github.com/KakkoiDev/aidb/cmd/aidb@latest
+curl -sSL https://raw.githubusercontent.com/KakkoiDev/aidb/master/install.sh | sh
 
 # Initialize
 aidb init
@@ -104,13 +104,16 @@ BINDIR=~/.local/bin make install
 
 ## Requirements
 
-- Go 1.21+
 - Git
-- `GOBIN` environment variable set (e.g. `export GOBIN=/usr/local/bin` in your shell profile)
 
 ## Installation
 
-**Go install (recommended)**
+**Binary (recommended)**
+```bash
+curl -sSL https://raw.githubusercontent.com/KakkoiDev/aidb/master/install.sh | sh
+```
+
+**Go install**
 ```bash
 go install github.com/KakkoiDev/aidb/cmd/aidb@latest
 ```

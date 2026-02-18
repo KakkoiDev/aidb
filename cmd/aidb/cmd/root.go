@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var (
 	flagJSON    bool
 	flagQuiet   bool
@@ -28,7 +30,7 @@ Commands:
   aidb status                  Show changes
   aidb commit <msg>            Commit changes
   aidb push/pull               Sync with remote`,
-	Version: "0.2.0",
+	Version: version,
 }
 
 func Execute() error {

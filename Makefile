@@ -1,5 +1,4 @@
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/bin
+BINDIR ?= $(or $(GOBIN),/usr/local/bin)
 
 .PHONY: build install uninstall test clean
 

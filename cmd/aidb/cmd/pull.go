@@ -30,7 +30,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("aidb not initialized")
 	}
 
-	gitCmd := exec.Command("git", "-C", cfg.DBDir, "pull")
+	gitCmd := exec.Command("git", "-C", cfg.DBDir, "pull", "--rebase")
 	gitCmd.Stdout = os.Stdout
 	gitCmd.Stderr = os.Stderr
 	if err := gitCmd.Run(); err != nil {

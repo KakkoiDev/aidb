@@ -98,7 +98,7 @@ cd ~/.aidb && git remote add origin <url>
 <summary>Custom installation path</summary>
 
 ```bash
-PREFIX=~/.local make install   # Install to ~/.local/bin
+BINDIR=~/.local/bin make install
 ```
 </details>
 
@@ -106,6 +106,7 @@ PREFIX=~/.local make install   # Install to ~/.local/bin
 
 - Go 1.21+
 - Git
+- `GOBIN` environment variable set (e.g. `export GOBIN=/usr/local/bin` in your shell profile)
 
 ## Installation
 
@@ -117,12 +118,12 @@ go install github.com/KakkoiDev/aidb/cmd/aidb@latest
 **From source**
 ```bash
 git clone git@github.com:KakkoiDev/aidb.git && cd aidb
-make build && sudo make install
+make build && make install
 ```
 
 **Uninstall**
 ```bash
-sudo make uninstall
+make uninstall
 ```
 
 ## AI Integration

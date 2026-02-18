@@ -30,11 +30,29 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("aidb not initialized")
 	}
 
-	gitCmd := exec.Command("git", "-C", cfg.DBDir, "pull", "--rebase")
-	gitCmd.Stdout = os.Stdout
-	gitCmd.Stderr = os.Stderr
-	if err := gitCmd.Run(); err != nil {
-		return fmt.Errorf("git pull failed: %w", err)
+	gitArgs := []string{"-C", cfg.DBDir}
+
+	// Stash unstaged changes before pulling
+	stash := exec.Command("git", append(gitArgs, "stash", "--include-untracked")...)
+	stash.Stdout = os.Stdout
+	stash.Stderr = os.Stderr
+	if err := stash.Run(); err != nil {
+		return fmt.Errorf("git stash failed: %w", err)
+	}
+
+	pullCmd := exec.Command("git", append(gitArgs, "pull", "--rebase")...)
+	pullCmd.Stdout = os.Stdout
+	pullCmd.Stderr = os.Stderr
+	pullErr := pullCmd.Run()
+
+	// Pop stash regardless of pull result
+	pop := exec.Command("git", append(gitArgs, "stash", "pop")...)
+	pop.Stdout = os.Stdout
+	pop.Stderr = os.Stderr
+	_ = pop.Run() // ignore error if stash was empty ("No stash entries")
+
+	if pullErr != nil {
+		return fmt.Errorf("git pull failed: %w", pullErr)
 	}
 
 	printSuccess("Pulled")

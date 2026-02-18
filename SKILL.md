@@ -16,6 +16,9 @@ Context-aware tool operating on the current git project.
 ### Binary
 
 ```bash
+# Recommended
+curl -sSL https://raw.githubusercontent.com/KakkoiDev/aidb/master/install.sh | sh
+
 # Go users
 go install github.com/KakkoiDev/aidb/cmd/aidb@latest
 
@@ -48,6 +51,12 @@ mkdir -p ~/.claude/skills/aidb && cp SKILL.md ~/.claude/skills/aidb/
 | `aidb commit "msg"` | Commit changes |
 | `aidb push` | Push to remote |
 | `aidb pull` | Pull from remote |
+
+## Releasing
+
+```bash
+make publish V=fix|feature|major|x.y.z
+```
 
 ## Path Structure
 

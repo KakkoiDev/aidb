@@ -129,6 +129,17 @@ make build && make install
 make uninstall
 ```
 
+## Releasing
+
+```bash
+make publish V=fix       # 0.3.0 → 0.3.1
+make publish V=feature   # 0.3.0 → 0.4.0
+make publish V=major     # 0.3.0 → 1.0.0
+make publish V=1.2.3     # explicit version
+```
+
+Tags and pushes to trigger the GitHub Actions release workflow.
+
 ## AI Integration
 
 ### Universal (AGENTS.md)

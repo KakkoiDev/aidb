@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/KakkoiDev/aidb/cmd/aidb/cmd.version=$(VERSION)
 BINDIR  ?= $(or $(GOBIN),$(HOME)/.local/bin)
 
-.PHONY: build install uninstall test clean release publish
+.PHONY: build install uninstall test test-install clean release publish
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o aidb ./cmd/aidb
@@ -16,6 +16,9 @@ uninstall:
 
 test:
 	go test ./...
+
+test-install:
+	sh test_install.sh
 
 clean:
 	rm -f aidb

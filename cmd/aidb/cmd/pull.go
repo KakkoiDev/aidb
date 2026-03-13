@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/spf13/cobra"
@@ -27,34 +28,59 @@ func runPull(cmd *cobra.Command, args []string) error {
 	}
 
 	if _, err := os.Stat(cfg.DBDir); os.IsNotExist(err) {
-		return fmt.Errorf("aidb not initialized")
+		return fmt.Errorf("aidb not initialized. Run: aidb init")
 	}
+
+	if !HasRemote(cfg.DBDir) {
+		return fmt.Errorf("no remote configured. Run: aidb init --remote <url>")
+	}
+
+	// Ensure pull.rebase is set so even raw `git pull` from ~/.aidb works
+	ensureRebaseConfig(cfg.DBDir)
 
 	gitArgs := []string{"-C", cfg.DBDir}
 
-	// Stash unstaged changes before pulling
-	stash := exec.Command("git", append(gitArgs, "stash", "--include-untracked")...)
-	stash.Stdout = os.Stdout
-	stash.Stderr = os.Stderr
-	if err := stash.Run(); err != nil {
-		return fmt.Errorf("git stash failed: %w", err)
-	}
-
-	pullCmd := exec.Command("git", append(gitArgs, "pull", "--rebase")...)
-	pullCmd.Stdout = os.Stdout
-	pullCmd.Stderr = os.Stderr
-	pullErr := pullCmd.Run()
-
-	// Pop stash regardless of pull result
-	pop := exec.Command("git", append(gitArgs, "stash", "pop")...)
-	pop.Stdout = os.Stdout
-	pop.Stderr = os.Stderr
-	_ = pop.Run() // ignore error if stash was empty ("No stash entries")
+	// Pull with rebase and autostash (handles dirty worktree automatically)
+	pullExec := exec.Command("git", append(gitArgs, "pull", "--rebase", "--autostash")...)
+	pullExec.Stdout = os.Stdout
+	pullExec.Stderr = os.Stderr
+	pullErr := pullExec.Run()
 
 	if pullErr != nil {
+		// Check if we're stuck in a rebase
+		if isRebaseInProgress(cfg.DBDir) {
+			printWarning("Rebase conflict detected, aborting rebase")
+			abort := exec.Command("git", append(gitArgs, "rebase", "--abort")...)
+			abort.Stdout = os.Stdout
+			abort.Stderr = os.Stderr
+			_ = abort.Run()
+			return fmt.Errorf("pull failed: rebase conflict. Resolve manually or force with: cd ~/.aidb && git pull --rebase")
+		}
 		return fmt.Errorf("git pull failed: %w", pullErr)
 	}
 
 	printSuccess("Pulled")
 	return nil
+}
+
+// ensureRebaseConfig sets pull.rebase=true in the repo config if not already set.
+// This prevents the "divergent branches" error when pulling outside of aidb.
+func ensureRebaseConfig(dir string) {
+	check := exec.Command("git", "-C", dir, "config", "--local", "pull.rebase")
+	out, err := check.Output()
+	if err != nil || strings.TrimSpace(string(out)) != "true" {
+		set := exec.Command("git", "-C", dir, "config", "--local", "pull.rebase", "true")
+		_ = set.Run()
+	}
+}
+
+// isRebaseInProgress checks if a rebase is currently in progress
+func isRebaseInProgress(dir string) bool {
+	for _, subdir := range []string{"rebase-merge", "rebase-apply"} {
+		gitDir := dir + "/.git/" + subdir
+		if _, err := os.Stat(gitDir); err == nil {
+			return true
+		}
+	}
+	return false
 }

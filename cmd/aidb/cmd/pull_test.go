@@ -115,7 +115,7 @@ func TestPullCommand_Rebase(t *testing.T) {
 	}
 }
 
-func TestPullCommand_StashUnstagedChanges(t *testing.T) {
+func TestPullCommand_AutostashUnstagedChanges(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()
 	remoteDir := setupPullEnv(t, env)
@@ -126,7 +126,7 @@ func TestPullCommand_StashUnstagedChanges(t *testing.T) {
 	// Create unstaged local change
 	env.CreateFile(filepath.Join(env.DBDir, "unstaged.txt"), "dirty")
 
-	// Pull should succeed despite unstaged changes
+	// Pull should succeed despite unstaged changes (autostash)
 	rootCmd.SetArgs([]string{"pull"})
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("pull command failed: %v", err)
@@ -147,6 +147,27 @@ func TestPullCommand_StashUnstagedChanges(t *testing.T) {
 	}
 }
 
+func TestPullCommand_SetsRebaseConfig(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	setupPullEnv(t, env)
+
+	rootCmd.SetArgs([]string{"pull"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("pull command failed: %v", err)
+	}
+
+	// Verify pull.rebase is set
+	cmd := exec.Command("git", "-C", env.DBDir, "config", "--local", "pull.rebase")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git config failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "true" {
+		t.Errorf("pull.rebase = %q, want %q", strings.TrimSpace(string(out)), "true")
+	}
+}
+
 func TestPullCommand_NotInitialized(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()
@@ -154,5 +175,92 @@ func TestPullCommand_NotInitialized(t *testing.T) {
 	rootCmd.SetArgs([]string{"pull"})
 	if err := rootCmd.Execute(); err == nil {
 		t.Fatal("pull should fail when not initialized")
+	}
+}
+
+func TestPullCommand_DivergentBranches(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	remoteDir := setupPullEnv(t, env)
+
+	// Create local commit
+	env.CreateFile(filepath.Join(env.DBDir, "local.txt"), "local change")
+	run(t, env.DBDir, "git", "add", ".")
+	run(t, env.DBDir, "git", "commit", "-m", "local diverge")
+
+	// Create remote commit (divergent)
+	pushToRemote(t, env, remoteDir, "remote.txt", "remote change")
+
+	// Unset pull.rebase to simulate a fresh clone without config (ignore if not set)
+	unset := exec.Command("git", "-C", env.DBDir, "config", "--local", "--unset", "pull.rebase")
+	_ = unset.Run()
+
+	// Pull should succeed via --rebase flag and also set the config
+	rootCmd.SetArgs([]string{"pull"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("pull should handle divergent branches, got: %v", err)
+	}
+
+	// Both files should exist
+	if !env.FileExists(filepath.Join(env.DBDir, "local.txt")) {
+		t.Error("local.txt should exist")
+	}
+	if !env.FileExists(filepath.Join(env.DBDir, "remote.txt")) {
+		t.Error("remote.txt should exist")
+	}
+
+	// Config should now be set for future raw git pulls
+	cmd := exec.Command("git", "-C", env.DBDir, "config", "--local", "pull.rebase")
+	out, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(out)) != "true" {
+		t.Error("pull.rebase should be set to true after pull")
+	}
+}
+
+func TestPullCommand_StagedChangesPreserved(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	remoteDir := setupPullEnv(t, env)
+
+	// Push a change to remote
+	pushToRemote(t, env, remoteDir, "remote.txt", "remote")
+
+	// Create staged local change
+	env.CreateFile(filepath.Join(env.DBDir, "staged.txt"), "staged content")
+	run(t, env.DBDir, "git", "add", "staged.txt")
+
+	// Pull should succeed and preserve staged changes
+	rootCmd.SetArgs([]string{"pull"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("pull command failed: %v", err)
+	}
+
+	// Verify staged file survives
+	if !env.FileExists(filepath.Join(env.DBDir, "staged.txt")) {
+		t.Error("staged.txt should survive pull")
+	}
+	got := env.ReadFile(filepath.Join(env.DBDir, "staged.txt"))
+	if got != "staged content" {
+		t.Errorf("staged.txt content = %q, want %q", got, "staged content")
+	}
+}
+
+func TestPullCommand_NoRemote(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	// Init without remote
+	if err := os.MkdirAll(env.DBDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, env.DBDir, "git", "init")
+
+	rootCmd.SetArgs([]string{"pull"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("pull should fail when no remote configured")
+	}
+	if !strings.Contains(err.Error(), "no remote configured") {
+		t.Errorf("expected 'no remote configured' error, got: %v", err)
 	}
 }

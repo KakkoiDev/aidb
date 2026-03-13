@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
@@ -38,6 +39,12 @@ func Execute() error {
 }
 
 func init() {
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "(devel)" && info.Main.Version != "" {
+			version = info.Main.Version
+		}
+	}
+	rootCmd.Version = version
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
 	// Global flags (clig.dev compliant)

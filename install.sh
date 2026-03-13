@@ -18,13 +18,13 @@ case "$ARCH" in
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
-# Install directory
-if [ -n "$GOBIN" ]; then
-  BINDIR="$GOBIN"
-elif [ -d "$HOME/.local/bin" ]; then
-  BINDIR="$HOME/.local/bin"
-else
-  BINDIR="/usr/local/bin"
+# Install directory (override with BINDIR env var)
+if [ -z "$BINDIR" ]; then
+  if [ -n "$GOBIN" ]; then
+    BINDIR="$GOBIN"
+  else
+    BINDIR="$HOME/.local/bin"
+  fi
 fi
 
 # Get latest version
@@ -75,3 +75,10 @@ mkdir -p "$BINDIR"
 install -m 755 aidb "${BINDIR}/aidb"
 
 echo "Installed aidb v${VERSION} to ${BINDIR}/aidb"
+
+# Check if BINDIR is in PATH
+case ":$PATH:" in
+  *":$BINDIR:"*) ;;
+  *) echo "Note: $BINDIR is not in your PATH. Add it with:"
+     echo "  export PATH=\"$BINDIR:\$PATH\"" ;;
+esac

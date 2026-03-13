@@ -1,6 +1,6 @@
-VERSION ?= dev
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/KakkoiDev/aidb/cmd/aidb/cmd.version=$(VERSION)
-BINDIR  ?= $(or $(GOBIN),/usr/local/bin)
+BINDIR  ?= $(or $(GOBIN),$(HOME)/.local/bin)
 
 .PHONY: build install uninstall test clean release publish
 

@@ -28,15 +28,21 @@ last.
    PROPOSALS to an inbox, marks sources seen.
 3. Review gate (Go) - `aidb review` (accept/edit/reject proposals) + `aidb encyclopedia` (browse
    canonical knowledge). Editing is markdown in `$EDITOR`.
-4. Scheduler (Go + launchd) - `aidb consolidate enable/disable/status`, per-machine hourly job that
-   pulls -> runs the skill headless -> commits -> pushes (with retry).
+4. Scheduler (Go + launchd) - `aidb consolidate enable/disable/status`, per-machine scheduled job
+   (default DAILY, not hourly) that pulls -> exits if nothing is unseen -> runs the skill headless ->
+   commits -> pushes (with retry).
 5. Drift safeguards (cross-cutting) - cron proposes only; raw files preserved; human promotes;
    provenance + timestamps; `[STALE: date]`; 2+-project rule for global promotion.
 
 ## Keystone design - conflict-free shared seen-state
 
 - Replace `internal/metadata/.metadata.json` with an append-only log `~/.aidb/.seen-events.jsonl`,
-  one event per line: `{"file":"rel/path","hash":"sha256:..","seenAt":"<UTC>","machine":"<host>","op":"seen|unseen"}`.
+  one event per line:
+  `{"file":"rel/path","hash":"sha256:..","commit":"<store HEAD>","seenAt":"<UTC>","machine":"<host>","op":"seen|unseen"}`.
+  The `commit` field (store HEAD at append time) lets the extractor diff a re-unseen file against its
+  last-seen version (`git diff <commit> -- <file>`) instead of re-consolidating the whole file.
+  Without it, every edit of a living doc (MEMO.md) re-proposes ALL its old insights under a new
+  source hash, the (source-file, source-hash) dedup key never collides, and the review inbox drowns.
 - `init` writes `.gitattributes` at the store root: `.seen-events.jsonl merge=union` (migration adds
   it to existing stores). Union merge = two machines appending different lines auto-merge; identical
   lines dedup; never a conflict.
@@ -52,12 +58,22 @@ last.
 ## Multi-machine cron (every machine runs it) - dedup / idempotency
 
 - Each `consolidate-run`: `aidb pull` (rebase+autostash) FIRST -> compute unseen AFTER pull ->
-  consolidate only those -> append `seen` events + write proposals -> `aidb commit` -> push.
-- Push safety (new): pull-before-push + one retry on rejection, in `push` and the run commands.
-  Today `push` has no rejection handling - multi-machine needs it.
-- Same-hour race (two machines consolidate the same file before either pushes): proposals are keyed
-  by `(source-file, source-hash)` so identical proposals collide rather than duplicate; any residual
-  duplicates are deduped by the human at review. Union-merge keeps both `seen` events harmlessly.
+  EXIT 0 if the queue is empty, before any LLM invocation (most runs) -> consolidate only the queue
+  -> append `seen` events + write proposals -> `aidb commit` -> push.
+- Cadence: default DAILY. Hourly was inherited from backup.go's StartInterval, but a backup is cheap
+  git ops while a consolidate-run is a paid LLM session against a queue that fills a few times a day
+  at most. Interval is a flag on `consolidate enable`; offset minutes per machine to shrink the
+  duplicate-run window.
+- Push safety: DONE (a48de8f). `pullRebase` (pull.go) and `pushWithUpstream` with one
+  retry-on-rejection (push.go) exist; `backup-run` already uses them. `consolidate-run` reuses them.
+- backup-run and consolidate-run share the store and may interleave commits. Every artifact must be
+  valid at file granularity (one file = one proposal, below). Do NOT add a lock file - a lock in a
+  git-synced store is a conflict machine.
+- Same-run race (two machines consolidate the same file before either pushes): proposal filenames
+  are content-addressed (id = hash of source file + source hash + category + snippet), so identical
+  candidates collide into one file rather than duplicate; residual near-duplicates are deduped by
+  the human at review. Union-merge keeps both `seen` events harmlessly. This handles correctness,
+  not cost - both machines still burned an LLM run; the schedule offset is the cost mitigation.
 - Headless caveat: cron runs with zero interactive context; the consolidation skill must be
   LOCAL-ONLY (read files, write markdown) with NO dependency on interactively-authed MCP
   (Notion/Slack/etc.), which may be absent in launchd/cron. State this as a skill constraint.
@@ -66,44 +82,58 @@ last.
 
 `skills/consolidate/SKILL.md` + ordered stage contracts. Reuse `AGENTS.md` categories + quality
 filter + 2+-project promotion rule (do not reinvent).
-- 01-ingest: the unseen queue (from `aidb list --unseen --json --aidb`) = files to process.
+- 01-ingest: TWO queues. (a) unseen RAW files (`aidb list --unseen --json` - MEMO/TASK/REVIEW etc.)
+  = candidates for the PROJECT tier; (b) unseen project `_aidb/` files (`--unseen --json --aidb`)
+  = candidates for GLOBAL promotion under the 2+-project rule. (An earlier draft listed only (b),
+  which consolidates the encyclopedia into itself and never mines the raw session files.)
 - 02-extract: per-file, pull candidate patterns into the standard categories; apply quality filter
-  (capture surprising/reusable/decision-rationale; skip obvious/one-off).
-- 03-propose: write candidates to an INBOX (`~/.aidb/_inbox/<date>/...` or `.aidb/proposals/`), each
-  snippet carrying provenance (source file, source hash, date, category, suggested tier). NEVER write
-  canonical `_aidb/`.
+  (capture surprising/reusable/decision-rationale; skip obvious/one-off). For a file with a prior
+  `seen` event, extract from `git diff <last-seen-commit> -- <file>` plus minimal context, not the
+  whole file - this is what keeps re-proposal noise down on living documents.
+- 03-propose: write candidates to `~/.aidb/_inbox/<id>.md` - flat, ONE FILE PER PROPOSAL, id =
+  content hash (see the race bullet above), provenance as YAML frontmatter (source file, source
+  hash, source commit, date, category, suggested tier). Skip ids present in `~/.aidb/.rejected.jsonl`
+  (append-only, `merge=union` like the seen log) so rejected candidates stay rejected. NEVER write
+  canonical `_aidb/`. `list` excludes `_inbox/` like other store metadata.
 - 04-mark-seen: append `seen` events for processed sources.
 Human-in-the-loop is between propose and canonical: the skill stops at proposals.
 
 ## Review gate (Go commands)
 
 - `aidb review` - list pending inbox proposals with provenance; `accept <id>` appends the snippet to
-  the right `_aidb/` file; `reject <id>` drops it; edit opens `$EDITOR`. Promotion to GLOBAL
+  the category's `_aidb/` file (category -> file mapping fixed, from AGENTS.md), deletes the
+  proposal, and commits through the normal commit path; `reject <id>` deletes the proposal AND
+  appends its id to `.rejected.jsonl` - without rejection memory, the next extraction resurrects
+  every rejected candidate; `edit <id>` opens `$EDITOR` before accept. Promotion to GLOBAL
   `~/.aidb/_aidb/` keeps the 2+-project rule (skill suggests, human confirms).
-- `aidb encyclopedia` - categorized read view of canonical `_aidb/` (flags: `--category`, `--search`).
-  Read-only browse; edits happen in `$EDITOR` on the markdown.
+- `aidb encyclopedia` - categorized read view of canonical `_aidb/`. DEFERRED: it gates nothing
+  (the gate is `review`), and `_aidb/` is plain markdown in a git repo where grep and the editor
+  already work. Build only if real usage shows the need.
 
 ## Ordered roadmap (what to do, in what order)
 
 Each task: write the failing test first (repo TASK.md mandates TDD; use `internal/testutil`), then
 implement, then update docs. A task is done only when its regression test fails on revert.
 
-Phase 0 - Foundation (smallest, unblocks all)
-- 0a. Staging fix - implement `PLAN-fix-staging-tracked-files.md` (add re-stages tracked; commit
-  `git add -u`). Tests: new `commit_test.go`; fix `add_test.go:87` (it locks the buggy behavior).
-- 0b. Push safety - pull-before-push + one retry on rejection in `push.go`, reused by `backup-run`
-  (`backup.go:199-227`) - the URGENT instance: it runs hourly via launchd, does `git add -A` +
-  commit + push with NO pull (guaranteed multi-machine rejections), and fails every hour when no
-  remote is configured (add a HasRemote no-op guard). Its `add -A` also sweeps untracked junk
-  dropped into `~/.aidb` into auto-commits - decide whether that stays.
+Phase 0 - Foundation (smallest, unblocks all) - DONE 2026-06-10
+- 0a. DONE (f589f78). add re-stages tracked files; commit runs `git add -u`; regression tests in
+  `commit_test.go` and the rewritten `add_test.go` fail on revert.
+- 0b. DONE (a48de8f). `pullRebase` (pull.go) + `pushWithUpstream` with one retry (push.go);
+  `backup-run` pulls before pushing and no-ops the push without a remote. Decision taken: `add -A`
+  stays - whole-store backup is the command's job, and it is what carries `.origin` pins and will
+  carry the seen-log.
 
 Phase 1 - Conflict-free shared seen-ledger (keystone)
-- 1a. `init` writes `.gitattributes` (`.seen-events.jsonl merge=union`); add an idempotent ensure for
-  existing stores. Also extend `list.go`'s skip-list (list.go:83-86 skips only `.metadata.json`) so
-  `.gitattributes` and `.seen-events.jsonl` are not listed as knowledge files.
+- 1a. `init` writes `.gitattributes` (`merge=union` for `.seen-events.jsonl` AND `.rejected.jsonl`);
+  add an idempotent ensure for existing stores. Also extend `list.go`'s skip-list (it now skips
+  `.metadata.json` and `.origin`) with `.gitattributes`, `.seen-events.jsonl`, `.rejected.jsonl`,
+  and the `_inbox/` directory.
 - 1b. New `internal/seenlog` (append + replay) replacing `.metadata.json` reads/writes in
-  `seen.go`/`unseen.go`/`list.go`. `IsSeen` = replay + hash match.
-- 1c. `aidb migrate-metadata` one-time converter; `git rm --cached .metadata.json`.
+  `seen.go`/`unseen.go`/`list.go`/`remove.go` (remove mutates metadata today - easy to miss).
+  `IsSeen` = replay + hash match. Events record the store HEAD in the `commit` field at append time.
+- 1c. `aidb migrate-metadata` one-time converter; `git rm --cached .metadata.json` AND delete the
+  file from disk - `backup-run` does `git add -A` on schedule and silently re-commits anything left
+  behind.
 - 1d. TDD: concurrent-append test - two clones append different events, simulate `git pull`
   union-merge, assert no conflict and correct replay; edit-unsee test; tombstone (unseen) test.
 
@@ -114,15 +144,22 @@ Phase 2 - Consolidation skill (manual trigger first; prove before automating)
   sources marked seen.
 
 Phase 3 - Human review gate
-- 3a. `aidb review` (list/accept/reject/edit; accept appends to `_aidb/`). TDD with a fixture inbox.
-- 3b. `aidb encyclopedia` (categorized read of `_aidb/`). TDD with a fixture `_aidb/` tree.
+- 3a. `aidb review` (list/accept/reject/edit; accept appends to `_aidb/` and commits; reject
+  records the id in `.rejected.jsonl`). TDD with a fixture inbox.
+- 3b. `aidb encyclopedia` - DEFERRED (see Review gate section): grep over `_aidb/` markdown covers
+  browsing; build only on demonstrated need.
 
 Phase 4 - Automation (LAST)
 - 4a. `aidb consolidate enable/disable/status` - per-machine launchd job; clone `backup.go`'s plist
-  pattern (StartInterval 3600).
-- 4b. Hidden `consolidate-run`: pull -> invoke the skill headless -> commit (proposals + seen-log) ->
-  push-with-retry; log to `~/.aidb/consolidate.log`.
+  pattern (`backupPlistPath` helper exists). Default interval DAILY with a flag; per-machine minute
+  offset.
+- 4b. Hidden `consolidate-run`: `pullRebase` -> exit 0 if the unseen queue is empty -> invoke the
+  skill headless -> commit (proposals + seen-log) -> `pushWithUpstream` (both helpers exist since
+  0b); log to `~/.aidb/consolidate.log`.
 - 4c. Enforce the headless/local-only constraint; fail loudly if the skill needs absent MCP.
+  Acceptance must include a run under `launchctl kickstart`, not just an interactive shell - the
+  LLM CLI's own auth/env (keychain, PATH, HOME) is the likely headless failure, not the skill
+  content.
 
 Phase 5 - Docs + drift safeguards
 - 5a. Update `README.md` (new commands + framework framing), `AGENTS.md` (skill contract + inbox/
@@ -133,7 +170,7 @@ Phase 5 - Docs + drift safeguards
 
 ## Critical files
 
-- Ledger: `internal/metadata/metadata.go` -> new `internal/seenlog/`; `cmd/aidb/cmd/{seen,unseen,list,init}.go`.
+- Ledger: `internal/metadata/metadata.go` -> new `internal/seenlog/`; `cmd/aidb/cmd/{seen,unseen,list,remove,init}.go`.
 - Staging: `cmd/aidb/cmd/{add,commit}.go` (+ new `commit_test.go`, update `add_test.go`).
 - Push: `cmd/aidb/cmd/push.go`.
 - Scheduler: `cmd/aidb/cmd/backup.go` (pattern to clone) -> new `cmd/aidb/cmd/consolidate.go`.
@@ -161,7 +198,11 @@ Phase 5 - Docs + drift safeguards
 ## Open risks
 
 - Headless auth: if consolidation ever needs MCP (Notion/Slack), cron will fail silently - keep it
-  local-only or add an explicit precheck.
+  local-only or add an explicit precheck. The LLM CLI itself must also be proven under launchd
+  (keychain access, PATH, HOME) before trusting the schedule.
+- Inbox growth: nothing expires proposals. If review lapses, the inbox accumulates until the human
+  returns - acceptable for one user, but `aidb review` should print the pending count prominently
+  (and `aidb status` could surface it) so a stale inbox is visible, not silent.
 - Compaction vs union-merge: compaction rewrites the log (conflict-prone) - keep it manual/solo.
 - Skill quality: extraction quality is the real risk; the human gate contains it but does not fix a
   noisy extractor - tune the quality filter in Phase 2 before automating in Phase 4.

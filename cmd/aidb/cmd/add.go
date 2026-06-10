@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/spf13/cobra"
@@ -65,13 +66,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Process each file
+	failed := 0
 	for _, srcPath := range files {
 		if err := addFile(cfg, srcPath, storageDir, cwd); err != nil {
 			printError(fmt.Sprintf("%s: %v", filepath.Base(srcPath), err))
-			continue
+			failed++
 		}
 	}
 
+	if failed > 0 {
+		return fmt.Errorf("%d of %d failed", failed, len(files))
+	}
 	return nil
 }
 
@@ -134,7 +139,7 @@ func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
 	// Stage in git
 	gitCmd := exec.Command("git", "-C", cfg.DBDir, "add", dstPath)
 	if err := gitCmd.Run(); err != nil {
-		printWarning(fmt.Sprintf("%s: git add failed", relPath))
+		return fmt.Errorf("moved and symlinked, but git add failed: %w", err)
 	}
 
 	printSuccess(fmt.Sprintf("Added %s", relPath))
@@ -142,9 +147,10 @@ func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
 }
 
 func addDirectory(cfg *config.Config, srcDir, dstDir string) error {
-	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+	var errs []string
+	walkErr := filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if info.IsDir() {
 			return nil
@@ -155,25 +161,38 @@ func addDirectory(cfg *config.Config, srcDir, dstDir string) error {
 
 		// Create parent dirs
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
-			return err
+			errs = append(errs, fmt.Sprintf("%s: %v", relPath, err))
+			return nil
 		}
 
 		// Move file
 		if err := os.Rename(path, dstPath); err != nil {
-			return err
+			errs = append(errs, fmt.Sprintf("%s: %v", relPath, err))
+			return nil
 		}
 
 		// Create symlink back
 		if err := os.Symlink(dstPath, path); err != nil {
 			os.Rename(dstPath, path)
-			return err
+			errs = append(errs, fmt.Sprintf("%s: %v", relPath, err))
+			return nil
 		}
 
 		// Stage in git
 		gitCmd := exec.Command("git", "-C", cfg.DBDir, "add", dstPath)
-		gitCmd.Run()
+		if err := gitCmd.Run(); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: git add failed", relPath))
+			return nil
+		}
 
 		printSuccess(fmt.Sprintf("Added %s", relPath))
 		return nil
 	})
+	if walkErr != nil {
+		return walkErr
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
 }

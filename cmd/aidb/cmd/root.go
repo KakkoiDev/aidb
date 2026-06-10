@@ -32,6 +32,8 @@ Commands:
   aidb commit <msg>            Commit changes
   aidb push/pull               Sync with remote`,
 	Version: version,
+	// Runtime failures print the error only; usage is for usage errors (clig.dev)
+	SilenceUsage: true,
 }
 
 func Execute() error {

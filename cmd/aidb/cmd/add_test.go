@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +94,51 @@ func TestAddCommand_AlreadyTracked(t *testing.T) {
 	staged := gitOut(t, env.DBDir, "diff", "--cached", "--name-only")
 	if !strings.Contains(staged, "myproject/main/TASK.md") {
 		t.Errorf("modification should be staged, staged files: %q", staged)
+	}
+}
+
+func TestAddCommand_NonexistentFile(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	var stderr bytes.Buffer
+	rootCmd.SetErr(&stderr)
+	defer rootCmd.SetErr(nil)
+
+	rootCmd.SetArgs([]string{"add", "nope.md"})
+	if err := rootCmd.Execute(); err == nil {
+		t.Fatal("add of nonexistent file should fail")
+	}
+	if strings.Contains(stderr.String(), "Usage:") {
+		t.Error("runtime failure should not dump usage")
+	}
+}
+
+func TestAddCommand_PartialFailure(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	env.CreateFile(filepath.Join(repoDir, "good.md"), "# Good")
+
+	rootCmd.SetArgs([]string{"add", "good.md", "nope.md"})
+	if err := rootCmd.Execute(); err == nil {
+		t.Fatal("partial failure should return an error")
+	}
+
+	if !env.IsSymlink(filepath.Join(repoDir, "good.md")) {
+		t.Error("good.md should still be added despite the failing item")
 	}
 }
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/KakkoiDev/aidb/internal/config"
@@ -37,10 +38,15 @@ func runUnseen(cmd *cobra.Command, args []string) error {
 	}
 
 	count := 0
+	total := 0
+	failed := 0
 	for _, pattern := range args {
+		pattern = resolveStoreArg(cfg.DBDir, pattern)
 		matches, err := filepath.Glob(filepath.Join(cfg.DBDir, pattern))
 		if err != nil {
 			printError(fmt.Sprintf("invalid pattern: %s", pattern))
+			total++
+			failed++
 			continue
 		}
 
@@ -50,9 +56,21 @@ func runUnseen(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, path := range matches {
+			total++
 			relPath, err := filepath.Rel(cfg.DBDir, path)
 			if err != nil {
+				printError(fmt.Sprintf("%s: %v", path, err))
+				failed++
 				continue
+			}
+
+			// Unknown to metadata AND absent from the store = nothing to mark
+			if meta.GetInfo(relPath) == nil {
+				if _, err := os.Stat(path); err != nil {
+					printError(fmt.Sprintf("%s: not tracked", relPath))
+					failed++
+					continue
+				}
 			}
 
 			meta.MarkUnseen(relPath)
@@ -67,5 +85,8 @@ func runUnseen(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if failed > 0 {
+		return fmt.Errorf("%d of %d failed", failed, total)
+	}
 	return nil
 }

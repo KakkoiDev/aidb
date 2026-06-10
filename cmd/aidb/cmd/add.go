@@ -81,11 +81,16 @@ func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
 		return fmt.Errorf("file not found")
 	}
 
-	// Skip if already a symlink pointing to aidb
+	// Already a symlink pointing into the store: re-stage its current content
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, _ := os.Readlink(srcPath)
 		if filepath.HasPrefix(target, cfg.DBDir) {
-			return fmt.Errorf("already tracked")
+			gitCmd := exec.Command("git", "-C", cfg.DBDir, "add", target)
+			if err := gitCmd.Run(); err != nil {
+				return fmt.Errorf("failed to re-stage: %w", err)
+			}
+			printSuccess(fmt.Sprintf("Re-staged %s", filepath.Base(target)))
+			return nil
 		}
 		return fmt.Errorf("is a symlink")
 	}

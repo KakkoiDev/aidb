@@ -15,6 +15,9 @@ var commitCmd = &cobra.Command{
 	Short: "Commit staged changes",
 	Long: `Commit staged changes to the aidb repository.
 
+Edits and deletions of already-tracked files are staged automatically,
+across the whole store. New files must be tracked with 'aidb add' first.
+
 Examples:
   aidb commit "Add project notes"
   aidb commit "Update TASK.md with new requirements"`,
@@ -40,6 +43,12 @@ func runCommit(cmd *cobra.Command, args []string) error {
 	// Check if database directory exists
 	if _, err := os.Stat(cfg.DBDir); os.IsNotExist(err) {
 		return fmt.Errorf("aidb not initialized (run 'aidb add' first)")
+	}
+
+	// add -u stages edits/deletions of tracked files only; new files go through 'aidb add'
+	stage := exec.Command("git", "-C", cfg.DBDir, "add", "-u")
+	if err := stage.Run(); err != nil {
+		return fmt.Errorf("failed to stage tracked changes: %w", err)
 	}
 
 	// Check for staged changes

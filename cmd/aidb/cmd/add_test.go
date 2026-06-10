@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/KakkoiDev/aidb/internal/testutil"
@@ -69,25 +70,30 @@ func TestAddCommand_AlreadyTracked(t *testing.T) {
 
 	env.InitDBRepo()
 
-	// Create file directly in database
+	// Tracked file: stored in the db repo, committed, symlinked from the project
 	dbFile := filepath.Join(env.DBDir, "myproject", "main", "TASK.md")
-	if err := os.MkdirAll(filepath.Dir(dbFile), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dbFile, []byte("# Task"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	env.CreateFile(dbFile, "# Task")
+	run(t, env.DBDir, "git", "add", dbFile)
+	run(t, env.DBDir, "git", "commit", "-m", "initial")
 
-	// Create symlink pointing to it
 	testFile := filepath.Join(repoDir, "TASK.md")
 	if err := os.Symlink(dbFile, testFile); err != nil {
 		t.Fatal(err)
 	}
 
-	// Try to add - should report already tracked
+	// Modify the stored copy, then re-add: stages the modification
+	if err := os.WriteFile(dbFile, []byte("# Task v2"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	rootCmd.SetArgs([]string{"add", "TASK.md"})
-	// Note: command doesn't error, just prints message
-	_ = rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("add on tracked file failed: %v", err)
+	}
+
+	staged := gitOut(t, env.DBDir, "diff", "--cached", "--name-only")
+	if !strings.Contains(staged, "myproject/main/TASK.md") {
+		t.Errorf("modification should be staged, staged files: %q", staged)
+	}
 }
 
 func TestAddCommand_GlobPattern(t *testing.T) {

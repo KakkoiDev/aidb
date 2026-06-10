@@ -35,13 +35,13 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Run git status
 	gitCmd := exec.Command("git", "-C", cfg.DBDir, "status", "--short")
-	out, err := gitCmd.Output()
+	statusOut, err := gitCmd.Output()
 	if err != nil {
 		return fmt.Errorf("git status failed: %w", err)
 	}
 
-	output := strings.TrimSpace(string(out))
-	if output == "" {
+	trimmed := strings.TrimSpace(string(statusOut))
+	if trimmed == "" {
 		printInfo("Nothing to commit, working tree clean")
 		return nil
 	}
@@ -49,7 +49,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Println("Changes in aidb:")
 	fmt.Println()
 
-	lines := strings.Split(output, "\n")
+	lines := strings.Split(trimmed, "\n")
 	for _, line := range lines {
 		if len(line) < 3 {
 			continue
@@ -59,13 +59,13 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 		switch {
 		case status[0] == 'A':
-			fmt.Printf("  %s new file:   %s\n", colorGreen("+"), file)
+			fmt.Printf("  %s new file:   %s\n", out.Colorize("0;32", "+"), file)
 		case status[0] == 'M' || status[1] == 'M':
-			fmt.Printf("  %s modified:   %s\n", colorYellow("~"), file)
+			fmt.Printf("  %s modified:   %s\n", out.Colorize("1;33", "~"), file)
 		case status[0] == 'D' || status[1] == 'D':
-			fmt.Printf("  %s deleted:    %s\n", colorRed("-"), file)
+			fmt.Printf("  %s deleted:    %s\n", out.Colorize("0;31", "-"), file)
 		case status == "??":
-			fmt.Printf("  %s untracked:  %s\n", colorGray("?"), file)
+			fmt.Printf("  %s untracked:  %s\n", out.Colorize("0;90", "?"), file)
 		default:
 			fmt.Printf("  %s %s\n", status, file)
 		}
@@ -73,20 +73,4 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	return nil
-}
-
-func colorGreen(s string) string {
-	return fmt.Sprintf("\033[0;32m%s\033[0m", s)
-}
-
-func colorYellow(s string) string {
-	return fmt.Sprintf("\033[1;33m%s\033[0m", s)
-}
-
-func colorRed(s string) string {
-	return fmt.Sprintf("\033[0;31m%s\033[0m", s)
-}
-
-func colorGray(s string) string {
-	return fmt.Sprintf("\033[0;90m%s\033[0m", s)
 }

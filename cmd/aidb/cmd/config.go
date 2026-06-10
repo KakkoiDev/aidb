@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var configCmd = &cobra.Command{
@@ -21,6 +18,14 @@ With two arguments, sets the key to the value.
 
 Config file: ~/.config/aidb/config.yaml
 
+Keys:
+  db.path     Database location (default ~/.aidb). Changing it does NOT
+              migrate existing files or symlinks.
+  git.remote  Origin remote of the database repository.
+
+backup.enabled is read-only here: it reports the launchd agent state,
+managed by 'aidb backup enable/disable'.
+
 Examples:
   aidb config              # Show all config
   aidb config db.path      # Show db.path value
@@ -33,57 +38,13 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 }
 
-type UserConfig struct {
-	DB struct {
-		Path string `yaml:"path,omitempty"`
-	} `yaml:"db,omitempty"`
-	Backup struct {
-		Enabled bool `yaml:"enabled,omitempty"`
-	} `yaml:"backup,omitempty"`
-	Git struct {
-		Remote string `yaml:"remote,omitempty"`
-	} `yaml:"git,omitempty"`
-}
-
-func getConfigPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "aidb", "config.yaml")
-}
-
-func loadUserConfig() (*UserConfig, error) {
-	cfg := &UserConfig{}
-	data, err := os.ReadFile(getConfigPath())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return cfg, nil
-		}
-		return nil, err
-	}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
-
-func saveUserConfig(cfg *UserConfig) error {
-	path := getConfigPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
-
 func runConfig(cmd *cobra.Command, args []string) error {
 	cfg, err := config.New()
 	if err != nil {
 		return err
 	}
 
-	userCfg, err := loadUserConfig()
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -93,10 +54,10 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		fmt.Println("# Current configuration")
 		fmt.Println()
 		fmt.Printf("db.path = %s\n", cfg.DBDir)
-		fmt.Printf("backup.enabled = %v\n", userCfg.Backup.Enabled)
+		fmt.Printf("backup.enabled = %v\n", backupPlistInstalled(cfg))
 		fmt.Printf("git.remote = %s\n", GetRemoteURL(cfg.DBDir))
 		fmt.Println()
-		fmt.Printf("# Config file: %s\n", getConfigPath())
+		fmt.Printf("# Config file: %s\n", config.UserConfigPath())
 		return nil
 	}
 
@@ -108,7 +69,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		case "db.path":
 			fmt.Println(cfg.DBDir)
 		case "backup.enabled":
-			fmt.Println(userCfg.Backup.Enabled)
+			fmt.Println(backupPlistInstalled(cfg))
 		case "git.remote":
 			fmt.Println(GetRemoteURL(cfg.DBDir))
 		default:
@@ -123,7 +84,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	case "db.path":
 		userCfg.DB.Path = value
 	case "backup.enabled":
-		userCfg.Backup.Enabled = value == "true"
+		return fmt.Errorf("backup.enabled is managed by 'aidb backup enable/disable'")
 	case "git.remote":
 		if err := configureRemote(cfg.DBDir, value); err != nil {
 			return fmt.Errorf("failed to configure remote: %w", err)
@@ -134,7 +95,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown config key: %s", key)
 	}
 
-	if err := saveUserConfig(userCfg); err != nil {
+	if err := config.SaveUserConfig(userCfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 

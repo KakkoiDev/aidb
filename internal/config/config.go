@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,16 +19,26 @@ type Config struct {
 	DBDir   string // ~/.aidb
 }
 
-// New creates a new Config with defaults
+// New creates a new Config: db.path from the user config when set, ~/.aidb otherwise
 func New() (*Config, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
 
+	userCfg, err := LoadUserConfig()
+	if err != nil {
+		return nil, fmt.Errorf("loading %s: %w", UserConfigPath(), err)
+	}
+
+	dbDir := filepath.Join(homeDir, ".aidb")
+	if userCfg.DB.Path != "" {
+		dbDir = userCfg.DB.Path
+	}
+
 	return &Config{
 		HomeDir: homeDir,
-		DBDir:   filepath.Join(homeDir, ".aidb"),
+		DBDir:   dbDir,
 	}, nil
 }
 

@@ -45,6 +45,16 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	}
 }
 
+func backupPlistPath(cfg *config.Config) string {
+	return filepath.Join(cfg.HomeDir, "Library", "LaunchAgents", "com.aidb.backup.plist")
+}
+
+// backupPlistInstalled reports the actual backup state: the plist is the source of truth
+func backupPlistInstalled(cfg *config.Config) bool {
+	_, err := os.Stat(backupPlistPath(cfg))
+	return err == nil
+}
+
 func enableBackup() error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("automatic backup only supported on macOS (launchd)")
@@ -62,7 +72,7 @@ func enableBackup() error {
 	}
 
 	// Create LaunchAgent plist
-	plistPath := filepath.Join(cfg.HomeDir, "Library", "LaunchAgents", "com.aidb.backup.plist")
+	plistPath := backupPlistPath(cfg)
 
 	plistTemplate := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -132,7 +142,7 @@ func disableBackup() error {
 		return err
 	}
 
-	plistPath := filepath.Join(cfg.HomeDir, "Library", "LaunchAgents", "com.aidb.backup.plist")
+	plistPath := backupPlistPath(cfg)
 
 	// Unload and remove
 	exec.Command("launchctl", "unload", plistPath).Run()
@@ -155,9 +165,7 @@ func backupStatus() error {
 		return err
 	}
 
-	plistPath := filepath.Join(cfg.HomeDir, "Library", "LaunchAgents", "com.aidb.backup.plist")
-
-	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+	if !backupPlistInstalled(cfg) {
 		printInfo("Backup is disabled")
 		return nil
 	}

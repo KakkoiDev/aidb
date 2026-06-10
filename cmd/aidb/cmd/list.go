@@ -150,12 +150,12 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, e := range entries {
-		status := colorGray("○")
+		status := out.Colorize("0;90", "○")
 		if e.Seen {
-			status = colorGreen("●")
+			status = out.Colorize("0;32", "●")
 		}
 		if e.Modified {
-			status = colorYellow("◐")
+			status = out.Colorize("1;33", "◐")
 		}
 
 		fmt.Printf("  %s %s\n", status, e.Path)

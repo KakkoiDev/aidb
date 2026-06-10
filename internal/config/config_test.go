@@ -27,6 +27,28 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNew_DBPathFromUserConfig(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	cfgPath := filepath.Join(env.HomeDir, ".config", "aidb", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	custom := filepath.Join(env.TempDir, "customdb")
+	if err := os.WriteFile(cfgPath, []byte("db:\n  path: "+custom+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DBDir != custom {
+		t.Errorf("DBDir = %q, want configured %q", cfg.DBDir, custom)
+	}
+}
+
 func TestGetProjectFromCwd_GitRepo(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()

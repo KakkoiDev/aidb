@@ -79,10 +79,15 @@ aidb seen project/_aidb/patterns.md
 
 ## How It Works
 
-- Files stored in `~/.aidb/{repo}/{branch}/{filename}`
+- Files stored in `~/.aidb/{repo}/{branch}/{path-relative-to-repo-root}`
 - Symlinks created at original locations
 - Git versioning for history and sync
 - Seen/unseen tracking with automatic change detection (modified files become unseen)
+
+Inside a git repo the store path is relative to the repo root regardless of the
+directory `aidb add` runs from. Before v0.3.x it was cwd-relative, so files
+added from a subdirectory back then may live at a different store path than new
+adds; no migration is performed. Paths outside the current project are refused.
 
 ## Configuration
 

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/KakkoiDev/aidb/internal/config"
 	"github.com/KakkoiDev/aidb/internal/metadata"
@@ -43,7 +42,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	linkPath := filepath.Join(cwd, filename)
+	linkPath := resolveArg(cwd, filename)
 
 	// Check if it's a symlink
 	info, err := os.Lstat(linkPath)
@@ -61,7 +60,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify target is in aidb
-	if !strings.HasPrefix(target, cfg.DBDir) {
+	if !withinDir(cfg.DBDir, target) {
 		return fmt.Errorf("file is not tracked by aidb: %s", filename)
 	}
 

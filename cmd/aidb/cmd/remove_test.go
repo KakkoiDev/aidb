@@ -62,6 +62,36 @@ func TestRemoveCommand(t *testing.T) {
 	}
 }
 
+func TestRemoveCommand_AbsolutePath(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "feature")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	dbFile := filepath.Join(env.DBDir, "myproject", "feature", "TASK.md")
+	env.CreateFile(dbFile, "# Task content")
+	linkPath := filepath.Join(repoDir, "TASK.md")
+	if err := os.Symlink(dbFile, linkPath); err != nil {
+		t.Fatal(err)
+	}
+
+	rootCmd.SetArgs([]string{"remove", linkPath})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("remove with absolute path failed: %v", err)
+	}
+
+	if env.IsSymlink(linkPath) {
+		t.Error("TASK.md should not be a symlink after remove")
+	}
+	if got := env.ReadFile(linkPath); got != "# Task content" {
+		t.Errorf("content = %q, want %q", got, "# Task content")
+	}
+}
+
 func TestRemoveCommand_NotTracked(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()

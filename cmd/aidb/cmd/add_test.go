@@ -142,6 +142,92 @@ func TestAddCommand_PartialFailure(t *testing.T) {
 	}
 }
 
+func TestAddCommand_AbsolutePath(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	testFile := filepath.Join(repoDir, "TASK.md")
+	env.CreateFile(testFile, "# Task")
+
+	rootCmd.SetArgs([]string{"add", testFile})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("add with absolute path failed: %v", err)
+	}
+	if !env.IsSymlink(testFile) {
+		t.Error("TASK.md should be a symlink after absolute-path add")
+	}
+}
+
+func TestAddCommand_SubdirSameStorePath(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	env.CreateFile(filepath.Join(repoDir, "docs", "x.md"), "# X")
+	env.CreateFile(filepath.Join(repoDir, "docs", "y.md"), "# Y")
+
+	// Add one file from the repo root, the other from inside docs/
+	rootCmd.SetArgs([]string{"add", "docs/x.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("add from root failed: %v", err)
+	}
+	if err := os.Chdir(filepath.Join(repoDir, "docs")); err != nil {
+		t.Fatal(err)
+	}
+	rootCmd.SetArgs([]string{"add", "y.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("add from subdir failed: %v", err)
+	}
+
+	relX, err := filepath.Rel(env.DBDir, env.SymlinkTarget(filepath.Join(repoDir, "docs", "x.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	relY, err := filepath.Rel(env.DBDir, env.SymlinkTarget(filepath.Join(repoDir, "docs", "y.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(relX) != filepath.Dir(relY) {
+		t.Errorf("store layout depends on cwd: %q vs %q", relX, relY)
+	}
+}
+
+func TestAddCommand_ParentEscapeRefused(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	outside := filepath.Join(env.WorkDir, "outside.md")
+	env.CreateFile(outside, "# Outside")
+
+	rootCmd.SetArgs([]string{"add", "../outside.md"})
+	if err := rootCmd.Execute(); err == nil {
+		t.Fatal("add escaping the project should be refused")
+	}
+	if env.IsSymlink(outside) {
+		t.Error("outside.md must not be moved into the store")
+	}
+	if !env.FileExists(outside) {
+		t.Error("outside.md must remain in place")
+	}
+}
+
 func TestAddCommand_GlobPattern(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()

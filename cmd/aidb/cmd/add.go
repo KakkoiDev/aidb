@@ -42,16 +42,23 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Expand globs
 	var files []string
 	for _, arg := range args {
-		matches, err := filepath.Glob(filepath.Join(cwd, arg))
+		pattern := resolveArg(cwd, arg)
+		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			return fmt.Errorf("invalid glob pattern: %s", arg)
 		}
 		if len(matches) == 0 {
 			// Not a glob, treat as literal path
-			files = append(files, filepath.Join(cwd, arg))
+			files = append(files, pattern)
 		} else {
 			files = append(files, matches...)
 		}
+	}
+
+	// In a git repo the store path is anchored at the repo toplevel, not the cwd
+	anchor := cwd
+	if top := config.GetGitToplevel(cwd); top != "" {
+		anchor = top
 	}
 
 	// Ensure base DB dir exists with git
@@ -68,7 +75,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Process each file
 	failed := 0
 	for _, srcPath := range files {
-		if err := addFile(cfg, srcPath, storageDir, cwd); err != nil {
+		if err := addFile(cfg, srcPath, storageDir, anchor); err != nil {
 			printError(fmt.Sprintf("%s: %v", filepath.Base(srcPath), err))
 			failed++
 		}
@@ -80,7 +87,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
+func addFile(cfg *config.Config, srcPath, storageDir, anchor string) error {
 	info, err := os.Lstat(srcPath)
 	if err != nil {
 		return fmt.Errorf("file not found")
@@ -89,7 +96,7 @@ func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
 	// Already a symlink pointing into the store: re-stage its current content
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, _ := os.Readlink(srcPath)
-		if filepath.HasPrefix(target, cfg.DBDir) {
+		if withinDir(cfg.DBDir, target) {
 			gitCmd := exec.Command("git", "-C", cfg.DBDir, "add", target)
 			if err := gitCmd.Run(); err != nil {
 				return fmt.Errorf("failed to re-stage: %w", err)
@@ -100,14 +107,23 @@ func addFile(cfg *config.Config, srcPath, storageDir, cwd string) error {
 		return fmt.Errorf("is a symlink")
 	}
 
-	// Get relative path from cwd for directory structure
-	relPath, err := filepath.Rel(cwd, srcPath)
+	// Normalize symlinked parents (e.g. /tmp -> /private/tmp) so Rel against
+	// the git toplevel compares physical paths
+	if resolved, err := filepath.EvalSymlinks(srcPath); err == nil {
+		srcPath = resolved
+	}
+
+	// Get relative path from the anchor for directory structure
+	relPath, err := filepath.Rel(anchor, srcPath)
 	if err != nil {
 		relPath = filepath.Base(srcPath)
 	}
 
 	// Destination in storage
 	dstPath := filepath.Join(storageDir, relPath)
+	if !withinDir(storageDir, dstPath) {
+		return fmt.Errorf("outside project namespace")
+	}
 
 	// Create parent dirs in storage
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {

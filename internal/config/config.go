@@ -127,14 +127,23 @@ func (c *Config) EnsureDBDir() error {
 	return nil
 }
 
-// getGitRepoName returns the git repository name
-func getGitRepoName(dir string) string {
+// GetGitToplevel returns the absolute repo root for dir, "" outside a git repo
+func GetGitToplevel(dir string) string {
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel")
 	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
-	return filepath.Base(strings.TrimSpace(string(out)))
+	return strings.TrimSpace(string(out))
+}
+
+// getGitRepoName returns the git repository name
+func getGitRepoName(dir string) string {
+	top := GetGitToplevel(dir)
+	if top == "" {
+		return ""
+	}
+	return filepath.Base(top)
 }
 
 // getGitBranch returns the current git branch

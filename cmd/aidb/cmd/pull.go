@@ -35,10 +35,20 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no remote configured. Run: aidb init --remote <url>")
 	}
 
-	// Ensure pull.rebase is set so even raw `git pull` from ~/.aidb works
-	ensureRebaseConfig(cfg.DBDir)
+	if err := pullRebase(cfg.DBDir); err != nil {
+		return err
+	}
 
-	gitArgs := []string{"-C", cfg.DBDir}
+	printSuccess("Pulled")
+	return nil
+}
+
+// pullRebase pulls with rebase + autostash, aborting a conflicted rebase
+func pullRebase(dbDir string) error {
+	// Ensure pull.rebase is set so even raw `git pull` from ~/.aidb works
+	ensureRebaseConfig(dbDir)
+
+	gitArgs := []string{"-C", dbDir}
 
 	// Pull with rebase and autostash (handles dirty worktree automatically)
 	pullExec := exec.Command("git", append(gitArgs, "pull", "--rebase", "--autostash")...)
@@ -48,7 +58,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	if pullErr != nil {
 		// Check if we're stuck in a rebase
-		if isRebaseInProgress(cfg.DBDir) {
+		if isRebaseInProgress(dbDir) {
 			printWarning("Rebase conflict detected, aborting rebase")
 			abort := exec.Command("git", append(gitArgs, "rebase", "--abort")...)
 			abort.Stdout = os.Stdout
@@ -58,8 +68,6 @@ func runPull(cmd *cobra.Command, args []string) error {
 		}
 		return fmt.Errorf("git pull failed: %w", pullErr)
 	}
-
-	printSuccess("Pulled")
 	return nil
 }
 

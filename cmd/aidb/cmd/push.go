@@ -35,22 +35,42 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no remote configured. Run: aidb init --remote <url>")
 	}
 
-	// Determine push args
-	pushArgs := []string{"-C", cfg.DBDir, "push"}
-
-	// Use -u flag if no upstream is set
-	if !HasUpstream(cfg.DBDir) {
-		branch := GetCurrentBranch(cfg.DBDir)
-		pushArgs = []string{"-C", cfg.DBDir, "push", "-u", "origin", branch}
+	if err := pushWithUpstream(cfg.DBDir); err != nil {
+		return err
 	}
 
-	gitCmd := exec.Command("git", pushArgs...)
+	printSuccess("Pushed")
+	return nil
+}
+
+// pushWithUpstream pushes, setting the upstream on first push.
+// With an upstream it pulls (rebase) first and retries once on rejection.
+func pushWithUpstream(dbDir string) error {
+	if !HasUpstream(dbDir) {
+		branch := GetCurrentBranch(dbDir)
+		return gitPush(dbDir, "-u", "origin", branch)
+	}
+
+	if err := pullRebase(dbDir); err != nil {
+		return err
+	}
+	if err := gitPush(dbDir); err == nil {
+		return nil
+	}
+	// Rejected: a push raced ours between the pull and the push
+	if err := pullRebase(dbDir); err != nil {
+		return err
+	}
+	return gitPush(dbDir)
+}
+
+func gitPush(dbDir string, extraArgs ...string) error {
+	args := append([]string{"-C", dbDir, "push"}, extraArgs...)
+	gitCmd := exec.Command("git", args...)
 	gitCmd.Stdout = os.Stdout
 	gitCmd.Stderr = os.Stderr
 	if err := gitCmd.Run(); err != nil {
 		return fmt.Errorf("git push failed: %w", err)
 	}
-
-	printSuccess("Pushed")
 	return nil
 }

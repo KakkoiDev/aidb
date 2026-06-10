@@ -218,9 +218,13 @@ func runBackupExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git commit failed: %w", err)
 	}
 
-	// Push
-	if err := exec.Command("git", "-C", cfg.DBDir, "push").Run(); err != nil {
-		return fmt.Errorf("git push failed: %w", err)
+	// Push (local backup still has value without a remote)
+	if !HasRemote(cfg.DBDir) {
+		fmt.Printf("[%s] No remote configured, skipping push\n", time.Now().Format(time.RFC3339))
+		return nil
+	}
+	if err := pushWithUpstream(cfg.DBDir); err != nil {
+		return err
 	}
 
 	fmt.Printf("[%s] Backup completed\n", time.Now().Format(time.RFC3339))

@@ -2,9 +2,15 @@
 
 Roadmap for evolving aidb from a git-backed file tracker into a memory framework: tracked files are
 ground-truth events; a conflict-free shared "seen" ledger drives an automated consolidation that
-PROPOSES knowledge; a human promotes proposals into canonical `_aidb/`. TDD throughout. No phase
+PROPOSES knowledge; a human promotes proposals into canonical `_knowledge/`. TDD throughout. No phase
 ships without a test that fails on revert. Build bottom-up: the ledger is the keystone; automation is
 last.
+
+Naming: the canonical knowledge dir is renamed `_aidb/` -> `_knowledge/` (project tier
+`<project>/<branch>/_knowledge/`, global `~/.aidb/_knowledge/`); proposals stage in `~/.aidb/_inbox/`.
+`_aidb` predates the framework and is redundant inside `~/.aidb`. Migration + flag rename in Phase 1e.
+Data files are JSONL and named `*.jsonl` (`.seen-events.jsonl`, `.rejected.jsonl`); `*.log` files
+(`backup.log`, `consolidate.log`) are launchd stdout captures, free-text process logs, never data.
 
 > Companion doc: `PLAN-fix-staging-tracked-files.md` is Phase 0a below.
 
@@ -26,8 +32,8 @@ last.
 1. Ledger (Go core) - append-only seen-log + replay; conflict-free via `merge=union`.
 2. Consolidation (ICM skill, not Go) - reads unseen files, extracts candidate patterns, writes
    PROPOSALS to an inbox, marks sources seen.
-3. Review gate (Go) - `aidb review` (accept/edit/reject proposals) + `aidb encyclopedia` (browse
-   canonical knowledge). Editing is markdown in `$EDITOR`.
+3. Review gate (Go) - `aidb review` (accept/edit/reject proposals); `aidb encyclopedia` (browse
+   canonical knowledge) is deferred. Editing is markdown in `$EDITOR`.
 4. Scheduler (Go + launchd) - `aidb consolidate enable/disable/status`, per-machine scheduled job
    (default DAILY, not hourly) that pulls -> exits if nothing is unseen -> runs the skill headless ->
    commits -> pushes (with retry).
@@ -81,11 +87,15 @@ last.
 ## Consolidation skill (ICM, modeled on /todo-triage)
 
 `skills/consolidate/SKILL.md` + ordered stage contracts. Reuse `AGENTS.md` categories + quality
-filter + 2+-project promotion rule (do not reinvent).
-- 01-ingest: TWO queues. (a) unseen RAW files (`aidb list --unseen --json` - MEMO/TASK/REVIEW etc.)
-  = candidates for the PROJECT tier; (b) unseen project `_aidb/` files (`--unseen --json --aidb`)
+filter + 2+-project promotion rule (do not reinvent the rules). CAVEAT: AGENTS.md narrates the
+legacy MEMO/TASK/REVIEW agent flow, which is no longer in use - carry over its category taxonomy,
+quality filter, and 2+-project rule, ignore its workflow narrative; AGENTS.md itself is rewritten in
+Phase 5a.
+- 01-ingest: TWO queues. (a) EVERY unseen tracked file (`aidb list --unseen --json` - whatever the
+  user saved, no filename allowlist; MEMO/TASK/REVIEW are legacy names, not a filter) = candidates
+  for the PROJECT tier; (b) unseen project `_knowledge/` files (`--unseen --json --knowledge`)
   = candidates for GLOBAL promotion under the 2+-project rule. (An earlier draft listed only (b),
-  which consolidates the encyclopedia into itself and never mines the raw session files.)
+  which consolidates the canonical knowledge into itself and never mines the raw files.)
 - 02-extract: per-file, pull candidate patterns into the standard categories; apply quality filter
   (capture surprising/reusable/decision-rationale; skip obvious/one-off). For a file with a prior
   `seen` event, extract from `git diff <last-seen-commit> -- <file>` plus minimal context, not the
@@ -94,21 +104,21 @@ filter + 2+-project promotion rule (do not reinvent).
   content hash (see the race bullet above), provenance as YAML frontmatter (source file, source
   hash, source commit, date, category, suggested tier). Skip ids present in `~/.aidb/.rejected.jsonl`
   (append-only, `merge=union` like the seen log) so rejected candidates stay rejected. NEVER write
-  canonical `_aidb/`. `list` excludes `_inbox/` like other store metadata.
+  canonical `_knowledge/`. `list` excludes `_inbox/` like other store metadata.
 - 04-mark-seen: append `seen` events for processed sources.
 Human-in-the-loop is between propose and canonical: the skill stops at proposals.
 
 ## Review gate (Go commands)
 
 - `aidb review` - list pending inbox proposals with provenance; `accept <id>` appends the snippet to
-  the category's `_aidb/` file (category -> file mapping fixed, from AGENTS.md), deletes the
-  proposal, and commits through the normal commit path; `reject <id>` deletes the proposal AND
-  appends its id to `.rejected.jsonl` - without rejection memory, the next extraction resurrects
-  every rejected candidate; `edit <id>` opens `$EDITOR` before accept. Promotion to GLOBAL
-  `~/.aidb/_aidb/` keeps the 2+-project rule (skill suggests, human confirms).
-- `aidb encyclopedia` - categorized read view of canonical `_aidb/`. DEFERRED: it gates nothing
-  (the gate is `review`), and `_aidb/` is plain markdown in a git repo where grep and the editor
-  already work. Build only if real usage shows the need.
+  the category's `_knowledge/` file (category -> file mapping fixed, taxonomy from AGENTS.md),
+  deletes the proposal, and commits through the normal commit path; `reject <id>` deletes the
+  proposal AND appends its id to `.rejected.jsonl` - without rejection memory, the next extraction
+  resurrects every rejected candidate; `edit <id>` opens `$EDITOR` before accept. Promotion to
+  GLOBAL `~/.aidb/_knowledge/` keeps the 2+-project rule (skill suggests, human confirms).
+- `aidb encyclopedia` - categorized read view of canonical `_knowledge/`. DEFERRED: it gates nothing
+  (the gate is `review`), and `_knowledge/` is plain markdown in a git repo where grep and the
+  editor already work. Build only if real usage shows the need.
 
 ## Ordered roadmap (what to do, in what order)
 
@@ -136,6 +146,12 @@ Phase 1 - Conflict-free shared seen-ledger (keystone)
   behind.
 - 1d. TDD: concurrent-append test - two clones append different events, simulate `git pull`
   union-merge, assert no conflict and correct replay; edit-unsee test; tombstone (unseen) test.
+- 1e. Store rename `_aidb/` -> `_knowledge/` (independent of the ledger; same migration sitting as
+  1c): one-time `git mv` for the global dir and every `<project>/<branch>/_aidb/`; rename
+  `list --aidb` -> `list --knowledge` and the `isAidbFile` filtering in `list.go` (clean break, no
+  alias - pre-1.0, single user); rewrite seen-log/metadata paths touched by the move. Idempotent,
+  TDD'd. Any external symlink pointing into a moved `_aidb/` (unusual; knowledge files are
+  store-native) is reported, not silently fixed.
 
 Phase 2 - Consolidation skill (manual trigger first; prove before automating)
 - 2a. Author `skills/consolidate` (4 stages above), reusing AGENTS.md categories/quality/promotion.
@@ -144,10 +160,10 @@ Phase 2 - Consolidation skill (manual trigger first; prove before automating)
   sources marked seen.
 
 Phase 3 - Human review gate
-- 3a. `aidb review` (list/accept/reject/edit; accept appends to `_aidb/` and commits; reject
+- 3a. `aidb review` (list/accept/reject/edit; accept appends to `_knowledge/` and commits; reject
   records the id in `.rejected.jsonl`). TDD with a fixture inbox.
-- 3b. `aidb encyclopedia` - DEFERRED (see Review gate section): grep over `_aidb/` markdown covers
-  browsing; build only on demonstrated need.
+- 3b. `aidb encyclopedia` - DEFERRED (see Review gate section): grep over `_knowledge/` markdown
+  covers browsing; build only on demonstrated need.
 
 Phase 4 - Automation (LAST)
 - 4a. `aidb consolidate enable/disable/status` - per-machine launchd job; clone `backup.go`'s plist
@@ -162,9 +178,11 @@ Phase 4 - Automation (LAST)
   content.
 
 Phase 5 - Docs + drift safeguards
-- 5a. Update `README.md` (new commands + framework framing), `AGENTS.md` (skill contract + inbox/
-  promote flow), `MEMO.md` (design decisions: event-sourced ledger, propose-don't-rewrite), `TASK.md`
-  (append these tasks to the roadmap), + a new skill doc.
+- 5a. Update `README.md` (new commands + framework framing + `_knowledge`/`_inbox` naming),
+  `AGENTS.md` (REWRITE around the framework - its MEMO/TASK/REVIEW agent-flow narrative is legacy;
+  keep the category taxonomy / quality filter / 2+-project rule), `SKILL.md`, + a new skill doc.
+  Sweep every `--aidb` / `_aidb` reference, including the user-level CLAUDE.md and skills that call
+  `aidb list --unseen --aidb` - they break at Phase 1e otherwise.
 - 5b. Encode invariants in docs + tests: cron proposes only; raw preserved; human promotes;
   provenance/timestamps; `[STALE]`; 2+-project global promotion.
 
@@ -174,7 +192,8 @@ Phase 5 - Docs + drift safeguards
 - Staging: `cmd/aidb/cmd/{add,commit}.go` (+ new `commit_test.go`, update `add_test.go`).
 - Push: `cmd/aidb/cmd/push.go`.
 - Scheduler: `cmd/aidb/cmd/backup.go` (pattern to clone) -> new `cmd/aidb/cmd/consolidate.go`.
-- Review: new `cmd/aidb/cmd/{review,encyclopedia}.go`.
+- Review: new `cmd/aidb/cmd/review.go` (`encyclopedia.go` only if un-deferred).
+- Rename: `cmd/aidb/cmd/list.go` (`--aidb` -> `--knowledge`, filter), migration command for 1e.
 - Skill: `~/Code/icm-runtime/skills/consolidate/` (SKILL.md + stages/).
 - Docs: `README.md`, `AGENTS.md`, `MEMO.md`, `TASK.md`.
 
@@ -183,8 +202,9 @@ Phase 5 - Docs + drift safeguards
 - `cd ~/Code/aidb && go build ./... && go test ./...` green after each phase.
 - Phase 1 acceptance: two cloned stores, each `aidb seen` a different file, `git pull` on both -> no
   conflict, `aidb list --unseen` consistent on both after sync.
-- Phase 2/3 acceptance: manual skill run -> proposals in inbox, `_aidb/` untouched; `aidb review
-  accept` moves one snippet into `_aidb/`; `aidb encyclopedia` shows it categorized.
+- Phase 2/3 acceptance: manual skill run -> proposals in inbox, `_knowledge/` untouched; `aidb
+  review accept` moves one snippet into `_knowledge/` and the rejection of another survives a
+  re-run (no resurrection).
 - Phase 4 acceptance: `aidb consolidate enable` installs the job; a forced `consolidate-run` pulls,
   proposes, commits, pushes; second machine sees the seen-events after pull (no re-analysis).
 
@@ -192,7 +212,7 @@ Phase 5 - Docs + drift safeguards
 
 - No CRDT library (Automerge/Yjs) - overkill for single-user/multi-machine; the union-merge log is
   the right cut.
-- The cron never writes canonical `_aidb/` - proposals only. This is the anti-drift invariant.
+- The cron never writes canonical `_knowledge/` - proposals only. This is the anti-drift invariant.
 - No server/daemon; aidb stays a git-backed CLI.
 
 ## Open risks

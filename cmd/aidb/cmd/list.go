@@ -80,8 +80,8 @@ func runList(cmd *cobra.Command, args []string) error {
 			}
 			return nil
 		}
-		// Skip metadata file
-		if info.Name() == ".metadata.json" {
+		// Skip store metadata files
+		if info.Name() == ".metadata.json" || info.Name() == ".origin" {
 			return nil
 		}
 

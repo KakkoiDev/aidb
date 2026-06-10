@@ -56,8 +56,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// In a git repo the store path is anchored at the repo toplevel, not the cwd
+	top := config.GetGitToplevel(cwd)
 	anchor := cwd
-	if top := config.GetGitToplevel(cwd); top != "" {
+	if top != "" {
 		anchor = top
 	}
 
@@ -70,6 +71,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	storageDir, err := cfg.EnsureStorageDir()
 	if err != nil {
 		return fmt.Errorf("failed to create storage dir: %w", err)
+	}
+
+	// Git projects are keyed by basename; refuse a colliding repo's add
+	if top != "" {
+		if err := pinOrigin(cfg.DBDir, filepath.Dir(storageDir), top); err != nil {
+			return err
+		}
 	}
 
 	// Process each file

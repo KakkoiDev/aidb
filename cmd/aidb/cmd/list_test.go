@@ -151,6 +151,38 @@ func TestListCommand_AidbFlag_ShowsOnlyAidbFiles(t *testing.T) {
 	}
 }
 
+func TestListCommand_SkipsOriginPin(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	env.InitDBRepo()
+
+	projectDir := filepath.Join(env.DBDir, "myproject", "main")
+	env.CreateFile(filepath.Join(projectDir, "MEMO.md"), "# Memo")
+	env.CreateFile(filepath.Join(env.DBDir, "myproject", ".origin"), `{"toplevel":"/x","remote":""}`)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"list", "--json", "--aidb=false", "--unseen=false"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("list command failed: %v", err)
+	}
+
+	var entries []FileEntry
+	if err := json.Unmarshal(buf.Bytes(), &entries); err != nil {
+		t.Fatalf("failed to parse JSON: %v", err)
+	}
+	for _, e := range entries {
+		if filepath.Base(e.Path) == ".origin" {
+			t.Errorf(".origin must not be listed, got %s", e.Path)
+		}
+	}
+}
+
 func TestListCommand_AidbFlag_WithUnseen(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()

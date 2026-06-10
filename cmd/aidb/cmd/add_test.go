@@ -228,6 +228,114 @@ func TestAddCommand_ParentEscapeRefused(t *testing.T) {
 	}
 }
 
+func TestAddCommand_SameBasenameCollisionRefused(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	env.InitDBRepo()
+
+	// Two distinct projects sharing the directory basename "proj"
+	repoA := env.InitGitRepoWithBranch(filepath.Join("a", "proj"), "main")
+	repoB := env.InitGitRepoWithBranch(filepath.Join("b", "proj"), "main")
+
+	if err := os.Chdir(repoA); err != nil {
+		t.Fatal(err)
+	}
+	env.CreateFile(filepath.Join(repoA, "TASK.md"), "# A")
+	rootCmd.SetArgs([]string{"add", "TASK.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("first add failed: %v", err)
+	}
+
+	if err := os.Chdir(repoB); err != nil {
+		t.Fatal(err)
+	}
+	env.CreateFile(filepath.Join(repoB, "NOTES.md"), "# B")
+	rootCmd.SetArgs([]string{"add", "NOTES.md"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("add into a namespace pinned to another repo should be refused")
+	}
+	if !strings.Contains(err.Error(), "a/proj") || !strings.Contains(err.Error(), "b/proj") {
+		t.Errorf("error should name both repo paths, got: %v", err)
+	}
+	if env.IsSymlink(filepath.Join(repoB, "NOTES.md")) {
+		t.Error("refused add must not move the file")
+	}
+}
+
+func TestAddCommand_SameRepoSecondAddOK(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	env.InitDBRepo()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+
+	env.CreateFile(filepath.Join(repoDir, "x.md"), "# X")
+	rootCmd.SetArgs([]string{"add", "x.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("first add failed: %v", err)
+	}
+
+	env.CreateFile(filepath.Join(repoDir, "y.md"), "# Y")
+	rootCmd.SetArgs([]string{"add", "y.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("second add from the same repo failed: %v", err)
+	}
+}
+
+func TestAddCommand_LazyPinExistingNamespace(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	env.InitDBRepo()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	branch := gitOut(t, repoDir, "rev-parse", "--abbrev-ref", "HEAD")
+
+	// Namespace predates origin pinning: files exist, no .origin
+	env.CreateFile(filepath.Join(env.DBDir, "myproject", branch, "old.md"), "# Old")
+
+	env.CreateFile(filepath.Join(repoDir, "new.md"), "# New")
+	rootCmd.SetArgs([]string{"add", "new.md"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("add into pre-pin namespace failed: %v", err)
+	}
+
+	if !env.FileExists(filepath.Join(env.DBDir, "myproject", ".origin")) {
+		t.Error("add should lazily pin the namespace with .origin")
+	}
+}
+
+func TestAddCommand_DetachedHeadRefused(t *testing.T) {
+	env := testutil.New(t)
+	defer env.Cleanup()
+	env.InitDBRepo()
+
+	repoDir := env.InitGitRepoWithBranch("myproject", "main")
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatal(err)
+	}
+	run(t, repoDir, "git", "checkout", "--detach")
+
+	env.CreateFile(filepath.Join(repoDir, "TASK.md"), "# Task")
+	rootCmd.SetArgs([]string{"add", "TASK.md"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("add from a detached HEAD should be refused")
+	}
+	if !strings.Contains(err.Error(), "detached HEAD") {
+		t.Errorf("expected detached HEAD error, got: %v", err)
+	}
+	if env.IsSymlink(filepath.Join(repoDir, "TASK.md")) {
+		t.Error("refused add must not move the file")
+	}
+}
+
 func TestAddCommand_GlobPattern(t *testing.T) {
 	env := testutil.New(t)
 	defer env.Cleanup()

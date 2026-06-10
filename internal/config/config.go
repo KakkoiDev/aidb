@@ -1,11 +1,16 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// errDetachedHead: a detached checkout has no branch to namespace under, and a
+// transient SHA namespace has no retrieval value
+var errDetachedHead = errors.New("detached HEAD - check out a branch before adding")
 
 // Config holds aidb configuration
 type Config struct {
@@ -47,6 +52,9 @@ func (c *Config) GetProjectFromCwd() (project, branch string, err error) {
 	if project != "" {
 		// Git repo: use repo name and branch
 		branch = getGitBranch(cwd)
+		if branch == "HEAD" {
+			return "", "", errDetachedHead
+		}
 		if branch == "" {
 			branch = "main"
 		}
@@ -71,6 +79,9 @@ func (c *Config) GetStoragePath(filename string) (string, error) {
 	if repoName != "" {
 		// Git repo: use repo name and branch
 		branch := getGitBranch(cwd)
+		if branch == "HEAD" {
+			return "", errDetachedHead
+		}
 		if branch == "" {
 			branch = "main"
 		}
